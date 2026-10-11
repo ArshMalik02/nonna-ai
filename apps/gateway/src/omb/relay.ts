@@ -1,5 +1,6 @@
 import type { Logger } from "../logger.js";
 import type { OmbClient, OmbMessage } from "./client.js";
+import { isUsageLimitError } from "./failover.js";
 
 export interface RelayDeps {
   omb: Pick<OmbClient, "getChannel" | "postToChannel" | "threadMessages" | "respond">;
@@ -9,6 +10,11 @@ export interface RelayDeps {
    * Anything else (shell, files, other servers) stays pending for a person.
    */
   autoApproveTool?: (tool: string) => boolean;
+  /**
+   * The turn failed because the model account is out of usage. Return true after switching to
+   * another engine; the relay then posts the same message again, once.
+   */
+  onUsageLimit?: () => Promise<boolean>;
   log: Logger;
   /**
    * Delivers one bot reply to the family group, plus any extra recipients (phone numbers)
@@ -34,6 +40,8 @@ const isReply = (m: OmbMessage) => m.role === "bot" && m.kind === "text" && Bool
 export class ChannelRelay {
   readonly #seen = new Set<string>();
   readonly #alsoTo = new Set<string>();
+  #lastText: string | undefined;
+  #retried = false;
   #watching: Promise<void> | undefined;
   #primed = false;
 
@@ -55,9 +63,11 @@ export class ChannelRelay {
     }
 
     await this.deps.omb.postToChannel(this.channelId, channel.threadId, text);
+    this.#lastText = text;
     this.#watching ??= this.#watch().finally(() => {
       this.#watching = undefined;
       this.#alsoTo.clear();
+      this.#retried = false;
     });
     return this.#watching;
   }
@@ -86,6 +96,10 @@ export class ChannelRelay {
         if (this.#seen.has(m.id)) continue;
         this.#seen.add(m.id);
         if (isReply(m)) await this.deps.deliver((m.text ?? "").trim(), [...this.#alsoTo]);
+        if (m.tool?.ok === false && isUsageLimitError(m.tool.name)) {
+          await this.#retryAfterLimit(channel.threadId);
+          idlePolls = 0;
+        }
       }
 
       // Settled: not busy for two polls in a row (a turn can take a moment to start).
@@ -93,6 +107,14 @@ export class ChannelRelay {
       if (idlePolls >= 2) return;
     }
     this.deps.log.warn("omb turn still running at relay deadline", { channelId: this.channelId });
+  }
+
+  async #retryAfterLimit(threadId: string) {
+    if (this.#retried || !this.#lastText || !this.deps.onUsageLimit) return;
+    this.#retried = true;
+    if (await this.deps.onUsageLimit()) {
+      await this.deps.omb.postToChannel(this.channelId, threadId, this.#lastText);
+    }
   }
 
   async #onPermission(threadId: string, requestId: string, tool: string) {

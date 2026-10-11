@@ -41,3 +41,13 @@ after editing the prompt.
 3. Claude asks before every MCP tool call. The gateway approves cards **only for `nonna`
    tools**; anything else waits for a person in the OMB UI.
 4. Each text reply the bot writes is sent to the family group as an iMessage.
+
+## When the Claude login runs out of usage
+
+Nonna runs on the Claude Code login (`claude` engine). When that account hits its 5-hour or
+weekly limit, OpenMausBot records the error in the channel; the gateway then switches the
+channel's bots to the API-key engine (`claudeApi`, same model), re-posts the message once, and
+tries the login again an hour later.
+
+Add the key once, in OpenMausBot itself (never in this repo): open http://127.0.0.1:8899 →
+**Settings → API keys → Anthropic**. OpenMausBot keeps it in its own data folder, owner-only.

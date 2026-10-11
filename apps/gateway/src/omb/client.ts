@@ -11,6 +11,12 @@ export interface OmbChannel {
   threadId: string;
   /** Set while a bot is working in this channel. */
   busyBotId?: string | null;
+  memberIds?: string[];
+}
+
+export interface ModelSelection {
+  instanceId: string;
+  model: string;
 }
 
 export interface OmbMessage {
@@ -19,6 +25,8 @@ export interface OmbMessage {
   kind?: string;
   text?: string;
   botId?: string;
+  /** Activity rows; a failed turn shows `ok: false` with `name: "error: …"`. */
+  tool?: { name?: string; ok?: boolean };
   /** Approval and question cards a turn is waiting on. */
   card?: {
     requestId?: string;
@@ -70,6 +78,14 @@ export class OmbClient {
       "GET",
       `/api/threads/${encodeURIComponent(threadId)}/messages?limit=${limit}`,
     )) as { messages: OmbMessage[]; hasMore: boolean };
+  }
+
+  /** Switches an idle bot's default and selected-task model. */
+  async setBotModel(botId: string, modelSelection: ModelSelection) {
+    await this.#request("PATCH", `/api/bots/${encodeURIComponent(botId)}`, {
+      modelSelection,
+      requireAvailableModel: true,
+    });
   }
 
   /** Answers an approval card. `always` remembers it for the rest of the session. */

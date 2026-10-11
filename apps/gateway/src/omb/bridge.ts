@@ -17,6 +17,8 @@ export interface BridgeDeps {
   lines: DialLines;
   log: Logger;
   pollMs?: number;
+  /** Switches engines when the model account runs out of usage (see failover.ts). */
+  onUsageLimit?: (channelId: string) => Promise<boolean>;
 }
 
 export interface TeamBridge {
@@ -57,6 +59,7 @@ export function createTeamBridge(deps: BridgeDeps): TeamBridge {
     let relay = relays.get(group.ombChannelId);
     if (!relay) {
       const dialGroupId = group.dialGroupId;
+      const channelId = group.ombChannelId;
       relay = new ChannelRelay(group.ombChannelId, {
         omb: deps.omb,
         log: deps.log,
@@ -68,6 +71,9 @@ export function createTeamBridge(deps: BridgeDeps): TeamBridge {
           }
         },
         autoApproveTool: (tool) => tool.startsWith(`mcp__${NONNA_MCP_SERVER}__`),
+        ...(deps.onUsageLimit
+          ? { onUsageLimit: () => deps.onUsageLimit?.(channelId) ?? Promise.resolve(false) }
+          : {}),
       });
       relays.set(group.ombChannelId, relay);
     }

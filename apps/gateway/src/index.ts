@@ -11,6 +11,7 @@ import { discoverGroups } from "./family/onboarding.js";
 import { createLogger } from "./logger.js";
 import { createTeamBridge } from "./omb/bridge.js";
 import { OmbClient } from "./omb/client.js";
+import { createModelFailover } from "./omb/failover.js";
 import { escalate } from "./safety/escalate.js";
 
 const env = loadEnv();
@@ -26,7 +27,20 @@ const darwinClient = new DarwinClient({
 });
 const darwin = env.DARWIN_MODE === "live" ? liveDarwin(darwinClient) : proxyDarwin();
 const omb = new OmbClient({ baseUrl: env.OMB_API_URL, token: env.OMB_API_TOKEN });
-const team = createTeamBridge({ store, dial, omb, lines: dialLines, log });
+const failover = createModelFailover({
+  omb,
+  log,
+  primary: { instanceId: env.OMB_PRIMARY_INSTANCE, model: env.NONNA_MODEL },
+  fallback: { instanceId: env.OMB_FALLBACK_INSTANCE, model: env.NONNA_MODEL },
+});
+const team = createTeamBridge({
+  store,
+  dial,
+  omb,
+  lines: dialLines,
+  log,
+  onUsageLimit: (channelId) => failover.onUsageLimit(channelId),
+});
 
 /** Run background work without blocking the webhook ack; never let it crash the process. */
 const background = (name: string, work: () => Promise<unknown>) => {
