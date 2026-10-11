@@ -17,7 +17,9 @@
     "check": "pnpm lint && pnpm typecheck && pnpm test",
     "db:generate": "pnpm --filter @nonna/gateway db:generate",
     "db:migrate": "pnpm --filter @nonna/gateway db:migrate",
-    "seed": "pnpm --filter @nonna/gateway seed"
+    "seed": "pnpm --filter @nonna/gateway seed",
+    "family:add": "pnpm --filter @nonna/gateway family:add",
+    "dial:connect": "pnpm --filter @nonna/gateway dial:connect"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",

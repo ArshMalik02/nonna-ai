@@ -2,7 +2,13 @@
   "$schema": "https://turborepo.com/schema.json",
   "ui": "stream",
   "agentGuidance": false,
-  "globalEnv": ["DATABASE_URL"],
+  "globalEnv": [
+    "DATABASE_URL",
+    "DIAL_API_URL",
+    "DIAL_API_KEY",
+    "PUBLIC_BASE_URL",
+    "CONTEXT_MCP_TOKEN"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

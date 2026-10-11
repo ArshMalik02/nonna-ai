@@ -1,9 +1,10 @@
 /**
- * Seeds a FAKE elder and family for local demos. Never put real people or health data here.
+ * Seeds a FAKE demo elder. Never put real people or health data here.
+ * Add family with `pnpm family:add` (stored only in your local database).
  * Usage: pnpm db:migrate && pnpm seed
  */
 import { createDb } from "../apps/gateway/src/db/client.js";
-import { circleMembers, elders } from "../apps/gateway/src/db/schema.js";
+import { elders } from "../apps/gateway/src/db/schema.js";
 
 const db = createDb(process.env.DATABASE_URL ?? "file:./data/nonna.db");
 
@@ -18,29 +19,4 @@ await db
   })
   .onConflictDoNothing();
 
-await db
-  .insert(circleMembers)
-  .values([
-    {
-      id: "member_daughter",
-      elderId: "elder_demo",
-      name: "Anna Lee",
-      phone: "+14155550124",
-      relation: "daughter",
-      priority: 0,
-      canApprove: true,
-      canPay: true,
-    },
-    {
-      id: "member_neighbor",
-      elderId: "elder_demo",
-      name: "Sam Ortiz",
-      phone: "+14155550125",
-      relation: "neighbor",
-      priority: 1,
-      isNearby: true,
-    },
-  ])
-  .onConflictDoNothing();
-
-process.stdout.write("Seeded demo elder and family.\n");
+process.stdout.write("Seeded demo elder.\n");

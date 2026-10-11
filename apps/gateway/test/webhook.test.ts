@@ -5,7 +5,8 @@ import { createLogger } from "../src/logger.js";
 import { MemoryStore } from "../src/store.js";
 
 const secret = "whsec_test";
-const dialLines = { elder: "+17852688267", family: "+12134764803" };
+const dialLines = { elder: "+14155550100", family: "+14155550101" };
+const contextMcpToken = "test-token-0123456789abcdef";
 
 function event(
   id: string,
@@ -65,13 +66,14 @@ describe("POST /webhooks/dial", () => {
       canPay: true,
       isNearby: false,
     });
-    store.groups.set("grp_family", "e1");
+    store.groups.set("grp_family", { dialGroupId: "grp_family", elderId: "e1" });
     escalate = vi.fn<AppDeps["escalate"]>();
     app = createApp({
       store,
       log: createLogger("error"),
       dialWebhookSecret: secret,
       dialLines,
+      contextMcpToken,
       escalate,
     });
   });
@@ -117,6 +119,57 @@ describe("POST /webhooks/dial", () => {
     expect(escalate).not.toHaveBeenCalled();
   });
 
+  it("passes non-emergency family group messages on", async () => {
+    const onFamilyGroupMessage = vi.fn();
+    app = createApp({
+      store,
+      log: createLogger("error"),
+      dialWebhookSecret: secret,
+      dialLines,
+      contextMcpToken,
+      escalate,
+      onFamilyGroupMessage,
+    });
+    await post(event("evt_8", "OK", "grandkid@example.com", { to: null, groupId: "grp_family" }));
+    expect(onFamilyGroupMessage).toHaveBeenCalledWith({
+      groupId: "grp_family",
+      elderId: "e1",
+      body: "OK",
+    });
+  });
+
+  it("triggers group discovery for a group it has not bound", async () => {
+    const onUnknownGroup = vi.fn();
+    app = createApp({
+      store,
+      log: createLogger("error"),
+      dialWebhookSecret: secret,
+      dialLines,
+      contextMcpToken,
+      escalate,
+      onUnknownGroup,
+    });
+    await post(event("evt_9", "Hi", "grandkid@example.com", { to: null, groupId: "grp_new" }));
+    expect(onUnknownGroup).toHaveBeenCalledWith("grp_new");
+  });
+
+  it("matches family members who iMessage from an Apple ID email", async () => {
+    store.circle.push({
+      id: "m2",
+      elderId: "e1",
+      name: "Sam",
+      phone: "+14155550199",
+      imessageHandle: "grandkid@example.com",
+      relation: "grandson",
+      priority: 1,
+      canApprove: true,
+      canPay: false,
+      isNearby: false,
+    });
+    await post(event("evt_10", "Grandma fell", "Grandkid@Example.com", { to: dialLines.family }));
+    expect(escalate).toHaveBeenCalledWith(expect.objectContaining({ elderId: "e1" }));
+  });
+
   it("ignores unknown senders", async () => {
     await post(event("evt_4", "I fell", "+19998887777"));
     expect(escalate).not.toHaveBeenCalled();
@@ -124,19 +177,38 @@ describe("POST /webhooks/dial", () => {
 });
 
 describe("context MCP auth", () => {
-  it("rejects callers that are not a registered elder", async () => {
-    const app = createApp({
+  const app = () =>
+    createApp({
       store: new MemoryStore(),
       log: createLogger("error"),
       dialWebhookSecret: secret,
       dialLines,
+      contextMcpToken,
       escalate: vi.fn(),
     });
-    const res = await app.request("/mcp/context", {
+
+  it("rejects requests without the shared token (spoofed caller headers)", async () => {
+    const res = await app().request("/mcp/context", {
       method: "POST",
-      headers: { "x-dial-user-number": "+19998887777" },
+      headers: { "x-dial-user-number": "+14155550123" },
     });
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(401);
+  });
+
+  it("gives callers that are not a registered elder no tools", async () => {
+    const res = await app().request("/mcp/context", {
+      method: "POST",
+      headers: {
+        "x-nonna-mcp-token": contextMcpToken,
+        "x-dial-user-number": "+19998887777",
+        "content-type": "application/json",
+        accept: "application/json, text/event-stream",
+      },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }),
+    });
+    const body = await res.text();
+    expect(body).toContain('"tools":[]');
+    expect(body).not.toContain("get_elder_profile");
   });
 });
 
@@ -155,11 +227,13 @@ describe("context MCP tools", () => {
       log: createLogger("error"),
       dialWebhookSecret: secret,
       dialLines,
+      contextMcpToken,
       escalate: vi.fn(),
     });
     const res = await app.request("/mcp/context", {
       method: "POST",
       headers: {
+        "x-nonna-mcp-token": contextMcpToken,
         "x-dial-user-number": "+14155550123",
         "content-type": "application/json",
         accept: "application/json, text/event-stream",

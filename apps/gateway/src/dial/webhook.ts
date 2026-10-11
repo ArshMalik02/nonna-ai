@@ -13,6 +13,10 @@ export interface WebhookDeps {
   lines: DialLines;
   /** Fired (not awaited) for emergencies so the webhook still acks within Dial's timeout. */
   onEmergency: (args: { elderId: string; groupId?: string | undefined; trigger: string }) => void;
+  /** A message arrived from a group we have not bound yet: run group discovery now. */
+  onUnknownGroup: (groupId: string) => void;
+  /** A non-emergency message in a bound family group. */
+  onFamilyGroupMessage: (args: { groupId: string; elderId: string; body: string }) => void;
   now?: () => number;
 }
 
@@ -59,10 +63,16 @@ export function dialWebhookRoutes(deps: WebhookDeps) {
         route.line === "elder"
           ? await deps.store.findElderByPhone(from)
           : route.line === "family" && route.kind === "group"
-            ? await deps.store.findElderByGroupId(route.groupId)
+            ? await deps.store
+                .getFamilyGroup(route.groupId)
+                .then((g) => (g ? deps.store.getElder(g.elderId) : undefined))
             : route.line === "family"
-              ? await deps.store.findElderByCircleMemberPhone(from)
+              ? await deps.store.findElderByFamilyHandle(from)
               : undefined;
+      if (!elder && route.line === "family" && route.kind === "group") {
+        deps.onUnknownGroup(route.groupId);
+        return c.json({ ok: true });
+      }
       if (!elder) {
         deps.log.warn("message from unknown sender", { eventId, line: route.line });
         return c.json({ ok: true });
@@ -76,7 +86,8 @@ export function dialWebhookRoutes(deps: WebhookDeps) {
         return c.json({ ok: true, escalated: true });
       }
 
-      // TODO(phase 1): hand off to the OMB family channel / task engine.
+      if (groupId) deps.onFamilyGroupMessage({ groupId, elderId: elder.id, body });
+      // TODO(phase 1): hand off elder and direct family messages to the OMB channel / task engine.
     }
 
     return c.json({ ok: true });

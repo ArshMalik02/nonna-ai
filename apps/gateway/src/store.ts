@@ -7,6 +7,13 @@ export interface NewTask {
   summary: string;
 }
 
+export interface FamilyGroup {
+  dialGroupId: string;
+  elderId: string;
+  /** Set when a family member replies OK to Nonna's welcome message. */
+  confirmedAt?: Date | undefined;
+}
+
 /**
  * Persistence boundary for the gateway. Route handlers depend on this interface only, so tests
  * run against `MemoryStore` and production uses the Drizzle implementation in `db/`.
@@ -14,12 +21,18 @@ export interface NewTask {
 export interface Store {
   /** Records a webhook event. Returns false if this event id was already seen (duplicate). */
   recordInboundEvent(event: { id: string; type: string; receivedAt: Date }): Promise<boolean>;
-  findElderByPhone(phone: string): Promise<Elder | undefined>;
-  findElderByGroupId(groupId: string): Promise<Elder | undefined>;
-  /** For direct iMessages to the family line: which elder does this family member belong to? */
-  findElderByCircleMemberPhone(phone: string): Promise<Elder | undefined>;
+  listElders(): Promise<Elder[]>;
   getElder(id: string): Promise<Elder | undefined>;
+  findElderByPhone(phone: string): Promise<Elder | undefined>;
+  /**
+   * Direct iMessages to the family line: which elder does this family member belong to?
+   * `handle` is what Dial reports as `from`: an E.164 phone or an Apple ID email.
+   */
+  findElderByFamilyHandle(handle: string): Promise<Elder | undefined>;
   listCircle(elderId: string): Promise<CircleMember[]>;
+  getFamilyGroup(dialGroupId: string): Promise<FamilyGroup | undefined>;
+  bindFamilyGroup(dialGroupId: string, elderId: string): Promise<void>;
+  confirmFamilyGroup(dialGroupId: string): Promise<void>;
   createTask(input: NewTask): Promise<Task>;
   audit(entry: { actor: string; action: string; taskId?: string; detail?: string }): Promise<void>;
 }
@@ -28,7 +41,7 @@ export class MemoryStore implements Store {
   readonly events = new Set<string>();
   readonly elders = new Map<string, Elder>();
   readonly circle: CircleMember[] = [];
-  readonly groups = new Map<string, string>();
+  readonly groups = new Map<string, FamilyGroup>();
   readonly tasks: Task[] = [];
   readonly auditLog: { actor: string; action: string }[] = [];
 
@@ -37,22 +50,32 @@ export class MemoryStore implements Store {
     this.events.add(event.id);
     return true;
   }
-  async findElderByPhone(phone: string) {
-    return [...this.elders.values()].find((e) => e.phone === phone);
-  }
-  async findElderByGroupId(groupId: string) {
-    const elderId = this.groups.get(groupId);
-    return elderId ? this.elders.get(elderId) : undefined;
-  }
-  async findElderByCircleMemberPhone(phone: string) {
-    const member = this.circle.find((m) => m.phone === phone);
-    return member ? this.elders.get(member.elderId) : undefined;
+  async listElders() {
+    return [...this.elders.values()];
   }
   async getElder(id: string) {
     return this.elders.get(id);
   }
+  async findElderByPhone(phone: string) {
+    return [...this.elders.values()].find((e) => e.phone === phone);
+  }
+  async findElderByFamilyHandle(handle: string) {
+    const h = handle.toLowerCase();
+    const member = this.circle.find((m) => m.phone === handle || m.imessageHandle === h);
+    return member ? this.elders.get(member.elderId) : undefined;
+  }
   async listCircle(elderId: string) {
     return this.circle.filter((m) => m.elderId === elderId).sort((a, b) => a.priority - b.priority);
+  }
+  async getFamilyGroup(dialGroupId: string) {
+    return this.groups.get(dialGroupId);
+  }
+  async bindFamilyGroup(dialGroupId: string, elderId: string) {
+    if (!this.groups.has(dialGroupId)) this.groups.set(dialGroupId, { dialGroupId, elderId });
+  }
+  async confirmFamilyGroup(dialGroupId: string) {
+    const g = this.groups.get(dialGroupId);
+    if (g) g.confirmedAt = new Date();
   }
   async createTask(input: NewTask) {
     const task: Task = { id: randomUUID(), status: "received", priority: 0, ...input };

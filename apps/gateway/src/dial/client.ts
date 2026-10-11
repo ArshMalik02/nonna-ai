@@ -19,6 +19,13 @@ export interface PlaceCallInput {
   idempotencyKey?: string;
 }
 
+export interface DialGroup {
+  id: string;
+  channel: "imessage" | "whatsapp";
+  name: string | null;
+  createdAt: string;
+}
+
 export interface SendMessageInput {
   to?: string;
   /** Group sends go out from whichever of our lines is in the group (the family line). */
@@ -55,8 +62,8 @@ export class DialClient {
   }
 
   /** Dial cannot join groups; poll this to discover groups a family member added Nonna to. */
-  listGroups() {
-    return this.#request("GET", "/api/v1/groups");
+  async listGroups() {
+    return (await this.#request("GET", "/api/v1/groups")) as { groups: DialGroup[] };
   }
 
   async #request(

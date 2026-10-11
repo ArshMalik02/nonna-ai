@@ -12,7 +12,9 @@
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "mkdir -p data && drizzle-kit migrate",
-    "seed": "tsx --env-file-if-exists=../../.env ../../scripts/seed-demo.ts"
+    "seed": "tsx --env-file-if-exists=../../.env ../../scripts/seed-demo.ts",
+    "family:add": "tsx --env-file-if-exists=../../.env ../../scripts/add-family-member.ts",
+    "dial:connect": "tsx --env-file-if-exists=../../.env ../../scripts/connect-dial.ts"
   },
   "dependencies": {
     "@hono/mcp": "^0.3.2",

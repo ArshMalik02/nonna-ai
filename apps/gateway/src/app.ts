@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
 import { secureHeaders } from "hono/secure-headers";
 import { contextMcpRoutes } from "./dial/context-mcp.js";
 import type { DialLines } from "./dial/lines.js";
@@ -11,7 +12,10 @@ export interface AppDeps {
   log: Logger;
   dialWebhookSecret: string;
   dialLines: DialLines;
+  contextMcpToken: string | undefined;
   escalate: (args: { elderId: string; groupId?: string | undefined; trigger: string }) => void;
+  onUnknownGroup?: (groupId: string) => void;
+  onFamilyGroupMessage?: (args: { groupId: string; elderId: string; body: string }) => void;
 }
 
 /** Builds the HTTP app from injected dependencies so tests can run it without a network. */
@@ -28,11 +32,25 @@ export function createApp(deps: AppDeps) {
       secret: deps.dialWebhookSecret,
       lines: deps.dialLines,
       onEmergency: deps.escalate,
+      onUnknownGroup: deps.onUnknownGroup ?? (() => {}),
+      onFamilyGroupMessage: deps.onFamilyGroupMessage ?? (() => {}),
     }),
   );
-  app.route("/mcp/context", contextMcpRoutes({ store: deps.store, onEscalate: deps.escalate }));
+  app.route(
+    "/mcp/context",
+    contextMcpRoutes({
+      store: deps.store,
+      token: deps.contextMcpToken,
+      onEscalate: deps.escalate,
+    }),
+  );
 
   app.onError((err, c) => {
+    // Protocol errors (e.g. from the MCP transport) carry their own status; pass them through.
+    if (err instanceof HTTPException) {
+      deps.log.warn("http error", { status: err.status, error: err.message, path: c.req.path });
+      return err.getResponse();
+    }
     deps.log.error("unhandled error", { error: err.message, path: c.req.path });
     return c.json({ error: "internal error" }, 500);
   });

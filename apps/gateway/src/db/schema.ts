@@ -28,14 +28,19 @@ export const circleMembers = sqliteTable(
       .notNull()
       .references(() => elders.id),
     name: text("name").notNull(),
-    phone: text("phone").notNull(),
+    phone: text("phone"),
+    imessageHandle: text("imessage_handle"),
     relation: text("relation").notNull(),
     priority: integer("priority").notNull().default(0),
     canApprove: integer("can_approve", { mode: "boolean" }).notNull().default(false),
     canPay: integer("can_pay", { mode: "boolean" }).notNull().default(false),
     isNearby: integer("is_nearby", { mode: "boolean" }).notNull().default(false),
   },
-  (t) => [index("circle_elder_idx").on(t.elderId)],
+  (t) => [
+    index("circle_elder_idx").on(t.elderId),
+    index("circle_phone_idx").on(t.phone),
+    index("circle_handle_idx").on(t.imessageHandle),
+  ],
 );
 
 export const familyGroups = sqliteTable("family_groups", {
@@ -44,6 +49,7 @@ export const familyGroups = sqliteTable("family_groups", {
     .notNull()
     .references(() => elders.id),
   ombChannelId: text("omb_channel_id"),
+  confirmedAt: integer("confirmed_at", { mode: "timestamp" }),
 });
 
 /** Every Dial webhook, keyed by X-Dial-Event-ID for at-least-once dedupe. */

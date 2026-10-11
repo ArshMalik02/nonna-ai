@@ -48,8 +48,8 @@ pnpm seed                     # fake demo elder + family
 pnpm dev                      # gateway on http://localhost:8787
 ```
 
-To receive Dial webhooks locally, expose the gateway with a tunnel (e.g. `cloudflared tunnel --url http://localhost:8787`)
-and register `https://<tunnel>/webhooks/dial`. Point the number's Context MCP at `https://<tunnel>/mcp/context`.
+To connect Dial to a gateway on your machine (tunnel, webhook, live-call MCP, family group),
+follow [`dial/README.md`](dial/README.md#connecting-dial-to-a-local-gateway).
 
 ## Scripts
 

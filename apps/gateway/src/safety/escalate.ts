@@ -23,9 +23,9 @@ export async function escalate(
   const { dial, log } = deps;
   const alert = `URGENT: ${elder.name} may need help (${opts.trigger}). Please call them now. Nonna is calling family in order.`;
 
-  const ladder = [...circle].sort(
-    (a, b) => Number(b.isNearby) - Number(a.isNearby) || a.priority - b.priority,
-  );
+  const ladder = circle
+    .filter((m): m is CircleMember & { phone: string } => Boolean(m.phone))
+    .sort((a, b) => Number(b.isNearby) - Number(a.isNearby) || a.priority - b.priority);
 
   const results = await Promise.allSettled([
     // The elder always hears from the elder line, the one number they know.

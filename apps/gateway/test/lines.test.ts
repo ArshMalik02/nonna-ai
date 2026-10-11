@@ -2,7 +2,7 @@ import type { DialMessageReceived } from "@nonna/shared";
 import { describe, expect, it } from "vitest";
 import { routeInbound } from "../src/dial/lines.js";
 
-const lines = { elder: "+17852688267", family: "+12134764803" };
+const lines = { elder: "+14155550100", family: "+14155550101" };
 const msg = (over: Partial<DialMessageReceived>): DialMessageReceived => ({
   messageId: "m",
   from: "+14155550123",

@@ -21,7 +21,10 @@ export const CircleMember = z.object({
   id: z.string(),
   elderId: z.string(),
   name: z.string(),
-  phone: Phone,
+  /** Optional when they only iMessage from an Apple ID; escalation calls skip them. */
+  phone: Phone.optional(),
+  /** Apple ID email they iMessage from, when it differs from their phone (Dial reports it as `from`). */
+  imessageHandle: z.string().optional(),
   relation: z.string(),
   /** Lower number is contacted first during escalation. */
   priority: z.number().int().min(0),
