@@ -27,8 +27,9 @@ type Search = {
 type Act = { status: string; simulated?: boolean; callId?: string; demoCall?: boolean };
 
 function setup(opts: { callsEnabled?: boolean; demoTarget?: string } = {}) {
-  const fetch = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) =>
-    new Response(JSON.stringify({ places: PLACES }), { status: 200 }),
+  const fetch = vi.fn(
+    async (_url: string | URL | Request, _init?: RequestInit) =>
+      new Response(JSON.stringify({ places: PLACES }), { status: 200 }),
   );
   const placeCall = vi.fn(async (_input: { to: string }) => ({ call: { id: "call_9" } }));
   const darwin = placesDarwin({

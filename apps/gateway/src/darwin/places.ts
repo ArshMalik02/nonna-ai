@@ -114,7 +114,8 @@ export function placesDarwin(deps: PlacesDeps): DarwinService {
           mode: "places",
           searchId,
           status: "no_match",
-          noMatchReason: "No business with a phone number matched. Try other words or ask the family.",
+          noMatchReason:
+            "No business with a phone number matched. Try other words or ask the family.",
         };
       }
       return {
