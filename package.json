@@ -1,0 +1,34 @@
+{
+  "name": "nonna-ai",
+  "private": true,
+  "description": "Nonna: an AI care coordinator for elders and their families, built on Dial, Darwin and OpenMausBot.",
+  "packageManager": "pnpm@10.34.6",
+  "engines": {
+    "node": ">=22"
+  },
+  "type": "module",
+  "scripts": {
+    "dev": "turbo run dev --filter=@nonna/gateway",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "check": "pnpm lint && pnpm typecheck && pnpm test",
+    "db:generate": "pnpm --filter @nonna/gateway db:generate",
+    "db:migrate": "pnpm --filter @nonna/gateway db:migrate",
+    "seed": "pnpm --filter @nonna/gateway seed"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.15",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.23.15",
+    "turbo": "^2.11.7",
+    "typescript": "^7.0.2"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}
