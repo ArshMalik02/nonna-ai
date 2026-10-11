@@ -113,7 +113,7 @@ for (const elder of await db.select().from(elders)) {
   const existing = groups.find((g) => g.ombChannelId)?.ombChannelId;
   let channelId = fleet.groups.find((g) => g.id === existing)?.id;
   if (channelId) {
-    await omb("PATCH", `/api/groups/${channelId}`, { bulletin });
+    await omb("PATCH", `/api/groups/${channelId}`, { name: `Family · ${elder.name}`, bulletin });
   } else {
     const created = await omb<{ group: { id: string } }>("POST", "/api/groups", {
       name: `Family · ${elder.name}`,
