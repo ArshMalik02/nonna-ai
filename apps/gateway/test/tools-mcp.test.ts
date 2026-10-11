@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app.js";
+import { proxyDarwin } from "../src/darwin/service.js";
 import { createLogger } from "../src/logger.js";
 import { MemoryStore } from "../src/store.js";
 
@@ -27,7 +28,7 @@ function setup() {
     dialLines: lines,
     contextMcpToken: undefined,
     escalate: vi.fn(),
-    tools: { dial, darwin: { search: vi.fn(async () => ({})) }, lines, token },
+    tools: { dial, darwin: proxyDarwin(), lines, token },
   });
   let id = 0;
   const call = async (name: string, args: Record<string, unknown>, auth = token) => {
@@ -95,5 +96,27 @@ describe("Nonna tools MCP", () => {
     expect(dial.placeCall).toHaveBeenCalledWith(
       expect.objectContaining({ to: "+14155550199", fromNumber: lines.family }),
     );
+    expect(store.steps).toContainEqual(
+      expect.objectContaining({
+        taskId: store.tasks[0]?.id,
+        executor: "dial_call",
+        dialCallId: undefined,
+      }),
+    );
+  });
+
+  it("searches and acts through the Darwin proxy, marking the result simulated", async () => {
+    const { store, call } = setup();
+    const search = await call("darwin_search", { query: "wheelchair ride to the clinic" });
+    expect(search.body).toContain("proxy.rides.wheelchairvan");
+    await call("create_task", { elderId: "e1", kind: "ride", summary: "Ride to the clinic" });
+    const act = await call("darwin_act", {
+      taskId: store.tasks[0]?.id,
+      agentId: "proxy.rides.wheelchairvan",
+      request:
+        "Pick up Mary Lee at 123 Demo St at 9:30 on Tuesday, wheelchair, to Berkeley Clinic.",
+    });
+    expect(act.body).toContain('\\"simulated\\":true');
+    expect(store.steps).toContainEqual(expect.objectContaining({ executor: "darwin_act" }));
   });
 });

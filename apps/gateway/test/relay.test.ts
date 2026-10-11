@@ -54,7 +54,7 @@ describe("ChannelRelay", () => {
     const { relay, deliver } = run(omb);
     await relay.send("Family: book a ride");
     expect(deliver).toHaveBeenCalledTimes(1);
-    expect(deliver).toHaveBeenCalledWith("Booked for 10am.");
+    expect(deliver).toHaveBeenCalledWith("Booked for 10am.", []);
   });
 
   it("approves Nonna's own tools and leaves other approvals for a person", async () => {

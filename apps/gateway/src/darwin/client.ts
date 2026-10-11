@@ -40,7 +40,13 @@ export class DarwinClient {
     });
   }
 
-  act(input: { searchId?: string; threadId?: string; message: unknown; idempotencyKey: string }) {
+  act(input: {
+    searchId?: string;
+    threadId?: string;
+    targets?: { agentId: string; capabilityId?: string }[];
+    message: unknown;
+    idempotencyKey: string;
+  }) {
     if (!this.opts.actEnabled) throw new Error("Darwin Act is disabled (DARWIN_ACT_ENABLED=false)");
     const { idempotencyKey, ...body } = input;
     return this.#request("POST", "/api/v3/act", this.opts.actKey, body, {

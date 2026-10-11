@@ -11,7 +11,9 @@
     "OMB_API_URL",
     "PORT",
     "NONNA_TOOLS_TOKEN",
-    "NONNA_MODEL"
+    "NONNA_MODEL",
+    "DIAL_ELDER_NUMBER",
+    "DIAL_FAMILY_NUMBER"
   ],
   "tasks": {
     "build": {

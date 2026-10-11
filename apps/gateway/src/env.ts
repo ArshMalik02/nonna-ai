@@ -20,6 +20,8 @@ const Env = z.object({
   /** How often to look for new family iMessage groups. */
   GROUP_POLL_SECONDS: z.coerce.number().int().min(10).default(60),
 
+  /** `proxy` uses the local catalog of fictional agents while Darwin is unavailable. */
+  DARWIN_MODE: z.enum(["live", "proxy"]).default("proxy"),
   DARWIN_API_URL: z.url().default("https://api.darwin.so"),
   DARWIN_SEARCH_KEY: z.string().optional(),
   DARWIN_ACT_KEY: z.string().optional(),

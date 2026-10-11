@@ -17,6 +17,7 @@ export interface AppDeps {
   escalate: (args: { elderId: string; groupId?: string | undefined; trigger: string }) => void;
   onUnknownGroup?: (groupId: string) => void;
   onInbound?: (msg: InboundMessage) => void;
+  onCallFinished?: (callId: string) => void;
   /** Serves /mcp/tools for OpenMausBot when provided. */
   tools?: Omit<ToolsMcpDeps, "store" | "log"> | undefined;
 }
@@ -37,6 +38,7 @@ export function createApp(deps: AppDeps) {
       onEmergency: deps.escalate,
       onUnknownGroup: deps.onUnknownGroup ?? (() => {}),
       onInbound: deps.onInbound ?? (() => {}),
+      onCallFinished: deps.onCallFinished ?? (() => {}),
     }),
   );
   app.route(

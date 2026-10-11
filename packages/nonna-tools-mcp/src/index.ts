@@ -40,10 +40,21 @@ export const nonnaTools = {
   },
   darwin_search: {
     description:
-      "Search Darwin for an outside agent that can do a task (ride, booking, payment). Returns candidates and whether they can be used now.",
+      "Search Darwin for an outside agent that can do a task (ride, booking, pharmacy, payment, home help...). Returns candidates with what they need, price and lead time. Put location, time, budget and mobility needs in context.",
     input: z.object({
       query: z.string().min(3).max(500),
       context: z.string().max(1000).optional(),
+    }),
+  },
+  darwin_act: {
+    description:
+      "Ask a Darwin agent from darwin_search to do the task. Only after a family member who can approve said YES. Include every required input in the request. A result marked simulated is a demo: tell the family it was a test booking.",
+    input: z.object({
+      taskId: z.string(),
+      agentId: z.string(),
+      capabilityId: z.string().optional(),
+      searchId: z.string().optional(),
+      request: z.string().min(10).max(1500),
     }),
   },
   dial_call_business: {

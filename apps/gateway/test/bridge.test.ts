@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createLogger } from "../src/logger.js";
 import { createTeamBridge } from "../src/omb/bridge.js";
+import type { OmbMessage } from "../src/omb/client.js";
 import { MemoryStore } from "../src/store.js";
 
 function setup({ confirmed }: { confirmed: boolean }) {
@@ -32,7 +33,12 @@ function setup({ confirmed }: { confirmed: boolean }) {
   const omb = {
     getChannel: vi.fn(async () => ({ id: "c1", name: "Family", threadId: "t1", busyBotId: null })),
     postToChannel: vi.fn(async () => {}),
-    threadMessages: vi.fn(async () => ({ messages: [], hasMore: false })),
+    threadMessages: vi.fn(
+      async (): Promise<{ messages: OmbMessage[]; hasMore: boolean }> => ({
+        messages: [],
+        hasMore: false,
+      }),
+    ),
     respond: vi.fn(async () => {}),
   };
   const dial = {
@@ -40,8 +46,16 @@ function setup({ confirmed }: { confirmed: boolean }) {
     setTyping: vi.fn(async () => ({})),
     listGroups: vi.fn(async () => ({ groups: [] })),
   };
-  const handle = createTeamBridge({ store, dial, omb, log: createLogger("error"), pollMs: 1 });
-  return { omb, dial, handle };
+  const lines = { elder: "+14155550100", family: "+14155550101" };
+  const bridge = createTeamBridge({
+    store,
+    dial,
+    omb,
+    lines,
+    log: createLogger("error"),
+    pollMs: 1,
+  });
+  return { omb, dial, handle: bridge.handle, bridge, lines };
 }
 
 describe("team bridge", () => {
@@ -74,8 +88,39 @@ describe("team bridge", () => {
     expect(omb.postToChannel).toHaveBeenCalledWith(
       "c1",
       "t1",
-      "The elder texted Nonna:\nI need my pills refilled",
+      "The elder texted Nonna (your reply goes to the elder and the family group):\nI need my pills refilled",
     );
+  });
+
+  it("sends replies to an elder's text to the family group and back to the elder", async () => {
+    const { omb, dial, handle, lines } = setup({ confirmed: true });
+    let polls = 0;
+    omb.threadMessages.mockImplementation(async () => {
+      polls += 1;
+      return {
+        messages:
+          polls > 1
+            ? [{ id: "r1", role: "bot", kind: "text", text: "I'll refill them today." }]
+            : [],
+        hasMore: false,
+      };
+    });
+    await handle({
+      elderId: "e1",
+      source: "elder",
+      from: "+14155550123",
+      body: "Pills?",
+      escalated: false,
+    });
+    expect(dial.sendMessage).toHaveBeenCalledWith({
+      groupId: "grp_1",
+      body: "I'll refill them today.",
+    });
+    expect(dial.sendMessage).toHaveBeenCalledWith({
+      to: "+14155550123",
+      fromNumber: lines.elder,
+      body: "I'll refill them today.",
+    });
   });
 
   it("keeps onboarding replies out of the team channel", async () => {

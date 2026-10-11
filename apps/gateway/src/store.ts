@@ -7,6 +7,16 @@ export interface NewTask {
   summary: string;
 }
 
+export interface NewTaskStep {
+  taskId: string;
+  executor: "darwin_act" | "dial_call" | "human";
+  status: string;
+  dialCallId?: string | undefined;
+  darwinSearchId?: string | undefined;
+  darwinThreadId?: string | undefined;
+  result?: string | undefined;
+}
+
 export interface FamilyGroup {
   dialGroupId: string;
   elderId: string;
@@ -41,6 +51,11 @@ export interface Store {
   getTask(id: string): Promise<Task | undefined>;
   listOpenTasks(elderId: string): Promise<Task[]>;
   setTaskStatus(id: string, status: TaskStatus): Promise<void>;
+  /** Tasks created at or after `since` (e.g. by the voice agent during a call). */
+  listTasksCreatedSince(elderId: string, since: Date): Promise<Task[]>;
+  addTaskStep(step: NewTaskStep): Promise<void>;
+  /** The task a Dial call was placed for, if any. */
+  findTaskByCallId(dialCallId: string): Promise<Task | undefined>;
   audit(entry: { actor: string; action: string; taskId?: string; detail?: string }): Promise<void>;
 }
 
@@ -50,6 +65,8 @@ export class MemoryStore implements Store {
   readonly circle: CircleMember[] = [];
   readonly groups = new Map<string, FamilyGroup>();
   readonly tasks: Task[] = [];
+  readonly taskCreatedAt = new Map<string, Date>();
+  readonly steps: NewTaskStep[] = [];
   readonly auditLog: { actor: string; action: string }[] = [];
 
   async recordInboundEvent(event: { id: string }) {
@@ -102,9 +119,22 @@ export class MemoryStore implements Store {
     const t = this.tasks.find((x) => x.id === id);
     if (t) t.status = status;
   }
+  async listTasksCreatedSince(elderId: string, since: Date) {
+    return this.tasks.filter(
+      (t) => t.elderId === elderId && (this.taskCreatedAt.get(t.id) ?? new Date(0)) >= since,
+    );
+  }
+  async addTaskStep(step: NewTaskStep) {
+    this.steps.push(step);
+  }
+  async findTaskByCallId(dialCallId: string) {
+    const step = this.steps.find((s) => s.dialCallId === dialCallId);
+    return step ? this.tasks.find((t) => t.id === step.taskId) : undefined;
+  }
   async createTask(input: NewTask) {
     const task: Task = { id: randomUUID(), status: "received", priority: 0, ...input };
     this.tasks.push(task);
+    this.taskCreatedAt.set(task.id, new Date());
     return task;
   }
   async audit(entry: { actor: string; action: string }) {

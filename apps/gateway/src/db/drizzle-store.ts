@@ -1,9 +1,17 @@
 import { randomUUID } from "node:crypto";
 import { type CircleMember, type Elder, type Task, TaskStatus } from "@nonna/shared";
-import { and, asc, eq, notInArray, or } from "drizzle-orm";
-import type { FamilyGroup, NewTask, Store } from "../store.js";
+import { and, asc, eq, gte, notInArray, or } from "drizzle-orm";
+import type { FamilyGroup, NewTask, NewTaskStep, Store } from "../store.js";
 import type { Db } from "./client.js";
-import { auditLog, circleMembers, elders, familyGroups, inboundEvents, tasks } from "./schema.js";
+import {
+  auditLog,
+  circleMembers,
+  elders,
+  familyGroups,
+  inboundEvents,
+  taskSteps,
+  tasks,
+} from "./schema.js";
 
 type ElderRow = typeof elders.$inferSelect;
 type MemberRow = typeof circleMembers.$inferSelect;
@@ -129,6 +137,28 @@ export class DrizzleStore implements Store {
         ),
       );
     return rows.map(toTask);
+  }
+
+  async listTasksCreatedSince(elderId: string, since: Date) {
+    const rows = await this.db
+      .select()
+      .from(tasks)
+      .where(and(eq(tasks.elderId, elderId), gte(tasks.createdAt, since)));
+    return rows.map(toTask);
+  }
+
+  async addTaskStep(step: NewTaskStep) {
+    await this.db.insert(taskSteps).values({ id: randomUUID(), ...step });
+  }
+
+  async findTaskByCallId(dialCallId: string) {
+    const [row] = await this.db
+      .select({ task: tasks })
+      .from(taskSteps)
+      .innerJoin(tasks, eq(taskSteps.taskId, tasks.id))
+      .where(eq(taskSteps.dialCallId, dialCallId))
+      .limit(1);
+    return row ? toTask(row.task) : undefined;
   }
 
   async setTaskStatus(id: string, status: TaskStatus) {

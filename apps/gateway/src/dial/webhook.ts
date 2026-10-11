@@ -26,6 +26,8 @@ export interface WebhookDeps {
   onEmergency: (args: { elderId: string; groupId?: string | undefined; trigger: string }) => void;
   /** A message arrived from a group we have not bound yet: run group discovery now. */
   onUnknownGroup: (groupId: string) => void;
+  /** A call has a transcript, or an outbound call ended without connecting. */
+  onCallFinished: (callId: string) => void;
   /** Every message from a known elder or family member, after the safety check. */
   onInbound: (msg: InboundMessage) => void;
   now?: () => number;
@@ -61,6 +63,18 @@ export function dialWebhookRoutes(deps: WebhookDeps) {
     if (!fresh) return c.json({ ok: true, duplicate: true });
 
     deps.log.info("dial event", { eventId, type: event.type });
+
+    if (event.type === "call.transcribed" || event.type === "call.ended") {
+      const data = event.data as { callId?: string; direction?: string; status?: string };
+      // Transcribed calls carry the full story. A call that never connected has no transcript,
+      // so report outbound ones (a clinic that didn't pick up) when they end.
+      const finishedWithoutTranscript =
+        event.type === "call.ended" && data.direction === "outbound" && data.status !== "completed";
+      if (data.callId && (event.type === "call.transcribed" || finishedWithoutTranscript)) {
+        deps.onCallFinished(data.callId);
+      }
+      return c.json({ ok: true });
+    }
 
     if (event.type === "message.received") {
       const msg = DialMessageReceived.safeParse(event.data);

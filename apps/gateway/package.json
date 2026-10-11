@@ -15,7 +15,8 @@
     "seed": "tsx --env-file-if-exists=../../.env scripts/seed-demo.ts",
     "family:add": "tsx --env-file-if-exists=../../.env scripts/add-family-member.ts",
     "dial:connect": "tsx --env-file-if-exists=../../.env scripts/connect-dial.ts",
-    "omb:setup": "tsx --env-file-if-exists=../../.env scripts/setup-omb.ts"
+    "omb:setup": "tsx --env-file-if-exists=../../.env scripts/setup-omb.ts",
+    "elder:set": "tsx --env-file-if-exists=../../.env scripts/set-elder.ts"
   },
   "dependencies": {
     "@hono/mcp": "^0.3.2",

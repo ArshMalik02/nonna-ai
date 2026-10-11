@@ -34,4 +34,12 @@ the elder, and posts a welcome; a family member replies OK to confirm.
 ## Still to do
 
 - 10DLC registration for the elder line: US carriers may filter SMS from unregistered numbers.
-- A real elder phone number (the seed uses a fake one, so the elder line can't match them yet).
+- Register the real elder: `pnpm elder:set --name "<name>" --phone <their own phone>` (the seed
+  uses a fake person). Their own phone, not Nonna's elder line, is what Dial reports as `from`.
+
+## What happens after a call
+
+When Dial reports a call transcript (`call.transcribed`), or an outbound call that never
+connected (`call.ended`), the gateway fetches the call and posts it to the elder's team channel:
+the elder's calls with any tasks the voice agent created, business calls against their task, and
+emergency calls to family. Nonna then posts a short summary to the family group and acts on it.

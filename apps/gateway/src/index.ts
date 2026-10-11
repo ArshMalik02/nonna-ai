@@ -1,6 +1,8 @@
 import { serve } from "@hono/node-server";
 import { createApp } from "./app.js";
+import { handleCallFinished } from "./calls/results.js";
 import { DarwinClient } from "./darwin/client.js";
+import { liveDarwin, proxyDarwin } from "./darwin/service.js";
 import { createDb } from "./db/client.js";
 import { DrizzleStore } from "./db/drizzle-store.js";
 import { DialClient } from "./dial/client.js";
@@ -16,14 +18,15 @@ const log = createLogger(env.LOG_LEVEL);
 const store = new DrizzleStore(createDb(env.DATABASE_URL));
 const dial = new DialClient({ baseUrl: env.DIAL_API_URL, apiKey: env.DIAL_API_KEY });
 const dialLines = { elder: env.DIAL_ELDER_NUMBER, family: env.DIAL_FAMILY_NUMBER };
-const darwin = new DarwinClient({
+const darwinClient = new DarwinClient({
   baseUrl: env.DARWIN_API_URL,
   searchKey: env.DARWIN_SEARCH_KEY,
   actKey: env.DARWIN_ACT_KEY,
   actEnabled: env.DARWIN_ACT_ENABLED,
 });
+const darwin = env.DARWIN_MODE === "live" ? liveDarwin(darwinClient) : proxyDarwin();
 const omb = new OmbClient({ baseUrl: env.OMB_API_URL, token: env.OMB_API_TOKEN });
-const toTeam = createTeamBridge({ store, dial, omb, log });
+const team = createTeamBridge({ store, dial, omb, lines: dialLines, log });
 
 /** Run background work without blocking the webhook ack; never let it crash the process. */
 const background = (name: string, work: () => Promise<unknown>) => {
@@ -56,7 +59,11 @@ const app = createApp({
       await escalate({ dial, log, lines: dialLines }, elder, circle, { groupId, trigger });
     }),
   onUnknownGroup: runDiscovery,
-  onInbound: (msg) => background("team handoff", () => toTeam(msg)),
+  onInbound: (msg) => background("team handoff", () => team.handle(msg)),
+  onCallFinished: (callId) =>
+    background("call result", () =>
+      handleCallFinished({ dial, store, team, lines: dialLines, log }, callId),
+    ),
   tools: { dial, darwin, lines: dialLines, token: env.NONNA_TOOLS_TOKEN },
 });
 

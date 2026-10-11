@@ -20,7 +20,8 @@
     "seed": "pnpm --filter @nonna/gateway seed",
     "family:add": "pnpm --filter @nonna/gateway family:add",
     "dial:connect": "pnpm --filter @nonna/gateway dial:connect",
-    "omb:setup": "pnpm --filter @nonna/gateway omb:setup"
+    "omb:setup": "pnpm --filter @nonna/gateway omb:setup",
+    "elder:set": "pnpm --filter @nonna/gateway elder:set"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",

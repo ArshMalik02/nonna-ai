@@ -3,7 +3,7 @@ import { StreamableHTTPTransport } from "@hono/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { nonnaTools } from "@nonna/tools-mcp";
 import { Hono } from "hono";
-import type { DarwinClient } from "../darwin/client.js";
+import type { DarwinService } from "../darwin/service.js";
 import type { DialClient } from "../dial/client.js";
 import type { DialLines } from "../dial/lines.js";
 import type { Logger } from "../logger.js";
@@ -13,7 +13,7 @@ import { canTransition } from "../tasks/state-machine.js";
 export interface ToolsMcpDeps {
   store: Store;
   dial: Pick<DialClient, "sendMessage" | "placeCall" | "getCall">;
-  darwin: Pick<DarwinClient, "search">;
+  darwin: DarwinService;
   lines: DialLines;
   log: Logger;
   /** Shared secret OpenMausBot sends as x-nonna-tools-token. */
@@ -128,13 +128,42 @@ function buildServer(deps: ToolsMcpDeps) {
     { description: t.darwin_search.description, inputSchema: t.darwin_search.input },
     async ({ query, context }) => {
       try {
-        const result = await deps.darwin.search({
-          query: context ? `${query}\nContext: ${context}` : query,
-          maxResults: 5,
-        });
-        return ok(result);
+        return ok(await deps.darwin.search({ query, context, maxResults: 5 }));
       } catch (err) {
         return fail(`Darwin search failed: ${String(err)}. Fall back to dial_call_business.`);
+      }
+    },
+  );
+
+  server.registerTool(
+    "darwin_act",
+    { description: t.darwin_act.description, inputSchema: t.darwin_act.input },
+    async ({ taskId, agentId, capabilityId, searchId, request }) => {
+      if (!(await store.getTask(taskId))) return fail(`No task ${taskId}`);
+      const idempotencyKey = createHash("sha256")
+        .update(`${taskId}|${agentId}|${request}`)
+        .digest("hex");
+      try {
+        const result = await deps.darwin.act({
+          agentId,
+          capabilityId,
+          searchId,
+          request,
+          idempotencyKey,
+        });
+        const r = result as { actRequestId?: string; status?: string };
+        await store.addTaskStep({
+          taskId,
+          executor: "darwin_act",
+          status: r.status ?? "requested",
+          darwinSearchId: searchId,
+          darwinThreadId: r.actRequestId,
+          result: JSON.stringify(result).slice(0, 2000),
+        });
+        await store.audit({ actor: "omb", action: `darwin_act_${deps.darwin.mode}`, taskId });
+        return ok(result);
+      } catch (err) {
+        return fail(`Darwin act failed: ${String(err)}. Fall back to dial_call_business.`);
       }
     },
   );
@@ -155,8 +184,18 @@ function buildServer(deps: ToolsMcpDeps) {
         maxCallDurationSeconds: 600,
         idempotencyKey,
       });
+      const callId = (call as { call?: { id?: string } }).call?.id;
+      await store.addTaskStep({
+        taskId,
+        executor: "dial_call",
+        status: "placed",
+        dialCallId: callId,
+      });
       await store.audit({ actor: "omb", action: "dial_call_business", taskId });
-      return ok(call);
+      return ok({
+        callId,
+        note: "The call is under way. Its transcript will be posted to this channel when it ends.",
+      });
     },
   );
 

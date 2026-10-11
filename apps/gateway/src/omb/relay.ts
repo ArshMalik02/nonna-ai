@@ -10,8 +10,11 @@ export interface RelayDeps {
    */
   autoApproveTool?: (tool: string) => boolean;
   log: Logger;
-  /** Delivers one bot reply to the family (the iMessage group). */
-  deliver: (text: string) => Promise<unknown>;
+  /**
+   * Delivers one bot reply to the family group, plus any extra recipients (phone numbers)
+   * collected for the current turn, e.g. the elder when the elder wrote in.
+   */
+  deliver: (text: string, alsoTo: readonly string[]) => Promise<unknown>;
   pollMs?: number;
   /** Give up on a turn that is still running after this long. */
   maxTurnMs?: number;
@@ -30,6 +33,7 @@ const isReply = (m: OmbMessage) => m.role === "bot" && m.kind === "text" && Bool
  */
 export class ChannelRelay {
   readonly #seen = new Set<string>();
+  readonly #alsoTo = new Set<string>();
   #watching: Promise<void> | undefined;
   #primed = false;
 
@@ -38,7 +42,8 @@ export class ChannelRelay {
     private readonly deps: RelayDeps,
   ) {}
 
-  async send(text: string) {
+  async send(text: string, opts: { alsoTo?: readonly string[] } = {}) {
+    for (const to of opts.alsoTo ?? []) this.#alsoTo.add(to);
     const channel = await this.deps.omb.getChannel(this.channelId);
     if (!channel) throw new Error(`OpenMausBot channel ${this.channelId} not found`);
 
@@ -52,6 +57,7 @@ export class ChannelRelay {
     await this.deps.omb.postToChannel(this.channelId, channel.threadId, text);
     this.#watching ??= this.#watch().finally(() => {
       this.#watching = undefined;
+      this.#alsoTo.clear();
     });
     return this.#watching;
   }
@@ -79,7 +85,7 @@ export class ChannelRelay {
         }
         if (this.#seen.has(m.id)) continue;
         this.#seen.add(m.id);
-        if (isReply(m)) await this.deps.deliver((m.text ?? "").trim());
+        if (isReply(m)) await this.deps.deliver((m.text ?? "").trim(), [...this.#alsoTo]);
       }
 
       // Settled: not busy for two polls in a row (a turn can take a moment to start).
