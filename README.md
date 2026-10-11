@@ -5,7 +5,7 @@ one number; Nonna books rides and appointments, handles paperwork, keeps the fam
 loop over iMessage, and escalates to real people when something is wrong.
 
 - **[Dial](https://docs.getdial.ai)** is the communication layer: phone number, AI voice, iMessage groups, outbound calls.
-- **[Darwin](https://darwin.so/docs)** is the discovery layer: finds outside agents (rides, bookings, payments) and acts through them. While Darwin is unavailable, `DARWIN_MODE=proxy` uses a local catalog of 60 fictional agents across Nonna's use cases ([`proxy-catalog.ts`](apps/gateway/src/darwin/proxy-catalog.ts)); acting through one returns a clearly simulated confirmation.
+- **[Darwin](https://darwin.so/docs)** is the discovery layer: finds outside agents (rides, bookings, payments) and acts through them. While Darwin is unavailable, `DARWIN_MODE=proxy` uses a local catalog of 60 fictional agents across Nonna's use cases ([`proxy-catalog.ts`](apps/gateway/src/darwin/proxy-catalog.ts)); acting through one returns a clearly simulated confirmation. `DARWIN_MODE=places` uses real businesses instead: Google Places finds them and Nonna books by phoning them through Dial (see [`omb/nonna-team.md`](omb/nonna-team.md#finding-and-booking-without-darwin)).
 - **[OpenMausBot](https://github.com/milind-soni/OpenMausBot)** runs the agent team, unmodified.
 - **This repo** is the glue: the gateway, the safety rules, the task engine and the team definition.
 

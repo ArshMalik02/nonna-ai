@@ -3,13 +3,14 @@ import type { DarwinClient } from "./client.js";
 import { PROXY_AGENTS, type ProxyAgent } from "./proxy-catalog.js";
 
 /**
- * What Nonna's tools need from Darwin. Two implementations:
+ * What Nonna's tools need from Darwin. Three implementations:
  * - `live`: the real Darwin Search/Act API.
  * - `proxy`: a local catalog of fictional agents (proxy-catalog.ts) with simulated Act, used
  *   while Darwin is unavailable. Results are always marked `mode: "proxy"` / `simulated: true`.
+ * - `places`: real businesses from Google Places; acting means a Dial phone call (places.ts).
  */
 export interface DarwinService {
-  readonly mode: "live" | "proxy";
+  readonly mode: "live" | "proxy" | "places";
   search(input: {
     query: string;
     context?: string | undefined;
@@ -21,6 +22,8 @@ export interface DarwinService {
     searchId?: string | undefined;
     request: string;
     idempotencyKey: string;
+    /** Who the request is for (the elder's name). Used by `places` to introduce the call. */
+    onBehalfOf?: string | undefined;
   }): Promise<unknown>;
 }
 
@@ -40,7 +43,7 @@ export function liveDarwin(client: Pick<DarwinClient, "search" | "act">): Darwin
 }
 
 // Darwin itself refuses emergencies; so does the proxy (the gateway's safety rules handle them).
-const EMERGENCY =
+export const EMERGENCY =
   /\b(911|emergency|ambulance|fell|fallen|chest pain|can'?t breathe|stroke|unconscious)\b/i;
 const STOP_WORDS = new Set(
   "a an and the to for of in on at my mom dad her his me i need want please can you book get find with from by is it".split(

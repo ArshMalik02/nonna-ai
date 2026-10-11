@@ -20,12 +20,27 @@ const Env = z.object({
   /** How often to look for new family iMessage groups. */
   GROUP_POLL_SECONDS: z.coerce.number().int().min(10).default(60),
 
-  /** `proxy` uses the local catalog of fictional agents while Darwin is unavailable. */
-  DARWIN_MODE: z.enum(["live", "proxy"]).default("proxy"),
+  /**
+   * `proxy` uses the local catalog of fictional agents while Darwin is unavailable.
+   * `places` finds real businesses with Google Places and books by phoning them through Dial.
+   */
+  DARWIN_MODE: z.enum(["live", "proxy", "places"]).default("proxy"),
   DARWIN_API_URL: z.url().default("https://api.darwin.so"),
   DARWIN_SEARCH_KEY: z.string().optional(),
   DARWIN_ACT_KEY: z.string().optional(),
   DARWIN_ACT_ENABLED: z.stringbool().default(false),
+  /** Google Places API (New) key, for DARWIN_MODE=places. */
+  GOOGLE_PLACES_API_KEY: z.string().optional(),
+  /** Only `true` lets Nonna phone a real business in places mode. */
+  PLACES_CALLS_ENABLED: z.stringbool().default(false),
+  /** While calls are disabled, places mode calls this number instead (e.g. a teammate's phone). */
+  DEMO_CALL_TARGET: z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z
+      .string()
+      .regex(/^\+[1-9]\d{6,14}$/)
+      .optional(),
+  ),
 
   OMB_API_URL: z.url().default("http://127.0.0.1:8899"),
   OMB_API_TOKEN: z.string().optional(),

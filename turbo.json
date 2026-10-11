@@ -13,7 +13,11 @@
     "NONNA_TOOLS_TOKEN",
     "NONNA_MODEL",
     "DIAL_ELDER_NUMBER",
-    "DIAL_FAMILY_NUMBER"
+    "DIAL_FAMILY_NUMBER",
+    "DARWIN_MODE",
+    "GOOGLE_PLACES_API_KEY",
+    "PLACES_CALLS_ENABLED",
+    "DEMO_CALL_TARGET"
   ],
   "tasks": {
     "build": {

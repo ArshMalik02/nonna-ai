@@ -139,7 +139,9 @@ function buildServer(deps: ToolsMcpDeps) {
     "darwin_act",
     { description: t.darwin_act.description, inputSchema: t.darwin_act.input },
     async ({ taskId, agentId, capabilityId, searchId, request }) => {
-      if (!(await store.getTask(taskId))) return fail(`No task ${taskId}`);
+      const task = await store.getTask(taskId);
+      if (!task) return fail(`No task ${taskId}`);
+      const elder = await store.getElder(task.elderId);
       const idempotencyKey = createHash("sha256")
         .update(`${taskId}|${agentId}|${request}`)
         .digest("hex");
@@ -150,14 +152,17 @@ function buildServer(deps: ToolsMcpDeps) {
           searchId,
           request,
           idempotencyKey,
+          onBehalfOf: elder?.name,
         });
-        const r = result as { actRequestId?: string; status?: string };
+        const r = result as { actRequestId?: string; status?: string; callId?: string };
         await store.addTaskStep({
           taskId,
           executor: "darwin_act",
           status: r.status ?? "requested",
           darwinSearchId: searchId,
           darwinThreadId: r.actRequestId,
+          // Places mode books by phone: link the call so its transcript comes back to this task.
+          dialCallId: r.callId,
           result: JSON.stringify(result).slice(0, 2000),
         });
         await store.audit({ actor: "omb", action: `darwin_act_${deps.darwin.mode}`, taskId });

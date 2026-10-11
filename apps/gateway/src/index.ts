@@ -2,7 +2,8 @@ import { serve } from "@hono/node-server";
 import { createApp } from "./app.js";
 import { handleCallFinished } from "./calls/results.js";
 import { DarwinClient } from "./darwin/client.js";
-import { liveDarwin, proxyDarwin } from "./darwin/service.js";
+import { placesDarwin } from "./darwin/places.js";
+import { type DarwinService, liveDarwin, proxyDarwin } from "./darwin/service.js";
 import { createDb } from "./db/client.js";
 import { DrizzleStore } from "./db/drizzle-store.js";
 import { DialClient } from "./dial/client.js";
@@ -25,7 +26,24 @@ const darwinClient = new DarwinClient({
   actKey: env.DARWIN_ACT_KEY,
   actEnabled: env.DARWIN_ACT_ENABLED,
 });
-const darwin = env.DARWIN_MODE === "live" ? liveDarwin(darwinClient) : proxyDarwin();
+function selectDarwin(): DarwinService {
+  if (env.DARWIN_MODE === "live") return liveDarwin(darwinClient);
+  if (env.DARWIN_MODE === "places") {
+    if (env.GOOGLE_PLACES_API_KEY) {
+      return placesDarwin({
+        apiKey: env.GOOGLE_PLACES_API_KEY,
+        dial,
+        fromNumber: dialLines.family,
+        callsEnabled: env.PLACES_CALLS_ENABLED,
+        demoTarget: env.DEMO_CALL_TARGET,
+      });
+    }
+    log.warn("DARWIN_MODE=places but GOOGLE_PLACES_API_KEY is missing; using the proxy catalog");
+  }
+  return proxyDarwin();
+}
+const darwin = selectDarwin();
+log.info("darwin mode", { mode: darwin.mode });
 const omb = new OmbClient({ baseUrl: env.OMB_API_URL, token: env.OMB_API_TOKEN });
 const failover = createModelFailover({
   omb,
