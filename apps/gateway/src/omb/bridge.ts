@@ -10,6 +10,18 @@ import { ChannelRelay } from "./relay.js";
 /** The name the gateway's tools are registered under in OpenMausBot (see scripts/setup-omb.ts). */
 export const NONNA_MCP_SERVER = "nonna";
 
+/** OpenMausBot's own tools for handing work to teammates (Nonna -> Rides, Appointments). */
+const TEAM_TOOLS = /(^|__)(coordinate_bots|ask_bot|delegate_bot)$/;
+
+/**
+ * Permission cards in the family channel that the gateway answers itself: Nonna's own MCP tools,
+ * and handing work to the specialists. Anything else (shell, files, other servers) waits for a
+ * person in the OpenMausBot UI.
+ */
+export function isAutoApprovedTool(tool: string): boolean {
+  return tool.startsWith(`mcp__${NONNA_MCP_SERVER}__`) || TEAM_TOOLS.test(tool);
+}
+
 export interface BridgeDeps {
   store: Store;
   dial: Pick<DialClient, "sendMessage" | "setTyping" | "listGroups">;
@@ -17,6 +29,8 @@ export interface BridgeDeps {
   lines: DialLines;
   log: Logger;
   pollMs?: number;
+  /** How long to keep relaying after the channel goes quiet (see ChannelRelay). */
+  lingerMs?: number;
   /** Switches engines when the model account runs out of usage (see failover.ts). */
   onUsageLimit?: (channelId: string) => Promise<boolean>;
 }
@@ -64,13 +78,17 @@ export function createTeamBridge(deps: BridgeDeps): TeamBridge {
         omb: deps.omb,
         log: deps.log,
         ...(deps.pollMs ? { pollMs: deps.pollMs } : {}),
+        // Specialists report back minutes later (a cab company call takes a while); keep relaying
+        // Nonna's follow-up to the family until the channel has been quiet this long.
+        lingerMs: deps.lingerMs ?? 10 * 60_000,
+        maxTurnMs: 30 * 60_000,
         deliver: async (reply, extra) => {
           await deps.dial.sendMessage({ groupId: dialGroupId, body: reply });
           for (const to of extra) {
             await deps.dial.sendMessage({ to, fromNumber: deps.lines.elder, body: reply });
           }
         },
-        autoApproveTool: (tool) => tool.startsWith(`mcp__${NONNA_MCP_SERVER}__`),
+        autoApproveTool: isAutoApprovedTool,
         ...(deps.onUsageLimit
           ? { onUsageLimit: () => deps.onUsageLimit?.(channelId) ?? Promise.resolve(false) }
           : {}),

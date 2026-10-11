@@ -24,6 +24,12 @@ export interface RelayDeps {
   pollMs?: number;
   /** Give up on a turn that is still running after this long. */
   maxTurnMs?: number;
+  /**
+   * Keep watching this long after the channel goes quiet. Nonna hands rides and appointments to
+   * specialists; their reports wake her up minutes later, and her reply must still reach the
+   * family. 0 stops as soon as the channel settles.
+   */
+  lingerMs?: number;
   sleep?: (ms: number) => Promise<void>;
 }
 
@@ -73,9 +79,15 @@ export class ChannelRelay {
   }
 
   async #watch() {
-    const { pollMs = 2_000, maxTurnMs = 10 * 60_000, sleep = defaultSleep } = this.deps;
+    const {
+      pollMs = 2_000,
+      maxTurnMs = 10 * 60_000,
+      lingerMs = 0,
+      sleep = defaultSleep,
+    } = this.deps;
     const deadline = Date.now() + maxTurnMs;
     let idlePolls = 0;
+    let lastActivity = Date.now();
 
     while (Date.now() < deadline) {
       await sleep(pollMs);
@@ -95,6 +107,7 @@ export class ChannelRelay {
         }
         if (this.#seen.has(m.id)) continue;
         this.#seen.add(m.id);
+        lastActivity = Date.now();
         if (isReply(m)) await this.deps.deliver((m.text ?? "").trim(), [...this.#alsoTo]);
         if (m.tool?.ok === false && isUsageLimitError(m.tool.name)) {
           await this.#retryAfterLimit(channel.threadId);
@@ -104,7 +117,8 @@ export class ChannelRelay {
 
       // Settled: not busy for two polls in a row (a turn can take a moment to start).
       idlePolls = channel.busyBotId ? 0 : idlePolls + 1;
-      if (idlePolls >= 2) return;
+      if (channel.busyBotId) lastActivity = Date.now();
+      if (idlePolls >= 2 && Date.now() - lastActivity >= lingerMs) return;
     }
     this.deps.log.warn("omb turn still running at relay deadline", { channelId: this.channelId });
   }

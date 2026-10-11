@@ -74,4 +74,34 @@ describe("ChannelRelay", () => {
     expect(omb.respond).toHaveBeenCalledWith("t1", "r1", "allow", true);
     expect(omb.respond).not.toHaveBeenCalledWith("t1", "r2", expect.anything(), expect.anything());
   });
+
+  it("keeps relaying a late reply while it lingers after the channel settles", async () => {
+    const omb = fakeOmb([
+      { busy: false },
+      { busy: true, add: [{ id: "b1", role: "bot", kind: "text", text: "Asking Rides." }] },
+      { busy: false },
+      { busy: false },
+      // Settled here: without lingering the relay would stop before Nonna's follow-up.
+      { busy: false },
+      { busy: false, add: [{ id: "b2", role: "bot", kind: "text", text: "Cab at 9:40." }] },
+      { busy: false },
+      { busy: false },
+    ]);
+    const deliver = vi.fn(async () => {});
+    let now = 0;
+    const spy = vi.spyOn(Date, "now").mockImplementation(() => now);
+    const relay = new ChannelRelay("c1", {
+      omb,
+      log: createLogger("error"),
+      deliver,
+      lingerMs: 5_000,
+      sleep: async () => {
+        now += 1_000;
+      },
+    });
+    await relay.send("Family: ride to Dr. Patel");
+    spy.mockRestore();
+    expect(deliver).toHaveBeenCalledWith("Asking Rides.", []);
+    expect(deliver).toHaveBeenCalledWith("Cab at 9:40.", []);
+  });
 });
