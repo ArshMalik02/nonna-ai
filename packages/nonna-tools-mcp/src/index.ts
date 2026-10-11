@@ -74,7 +74,7 @@ export const nonnaTools = {
   },
   dial_call_business: {
     description:
-      "Place an AI phone call to a business (clinic, pharmacy, cab company) to get a task done. Only after the family approved the plan. Returns a callId; check it later with get_call_result.",
+      "Place an AI phone call to a business (clinic, pharmacy, cab company) to get a task done. Only after the family approved the plan. Nonna has one phone line, so the call may be queued behind others (emergencies go first) and is capped at 5 minutes. The transcript is posted to the channel when it ends; never place the same call twice.",
     input: z.object({
       elderId: z.string(),
       taskId: z.string(),

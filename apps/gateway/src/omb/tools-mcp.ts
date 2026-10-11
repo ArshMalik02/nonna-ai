@@ -3,6 +3,7 @@ import { StreamableHTTPTransport } from "@hono/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { nonnaTools } from "@nonna/tools-mcp";
 import { Hono } from "hono";
+import type { CallLine } from "../calls/line.js";
 import { type DarwinExecutor, describeRun, ExecutorRefusal } from "../darwin/executor.js";
 import type { DialClient } from "../dial/client.js";
 import type { DialLines } from "../dial/lines.js";
@@ -12,13 +13,17 @@ import { canTransition } from "../tasks/state-machine.js";
 
 export interface ToolsMcpDeps {
   store: Store;
-  dial: Pick<DialClient, "sendMessage" | "placeCall" | "getCall">;
+  dial: Pick<DialClient, "sendMessage" | "getCall">;
+  line: Pick<CallLine, "enqueue">;
   darwin: DarwinExecutor;
   lines: DialLines;
   log: Logger;
   /** Shared secret OpenMausBot sends as x-nonna-tools-token. */
   token: string | undefined;
 }
+
+/** Business calls are capped so the single line frees up for the elder. */
+export const BUSINESS_CALL_MAX_SECONDS = 300;
 
 export const TOOLS_TOKEN_HEADER = "x-nonna-tools-token";
 const MAX_TOOL_OUTPUT = 6_000;
@@ -186,25 +191,37 @@ function buildServer(deps: ToolsMcpDeps) {
       if (!elder) return fail(`No elder ${elderId}`);
       if (!(await store.getTask(taskId))) return fail(`No task ${taskId}`);
       const idempotencyKey = createHash("sha256").update(`${taskId}|${to}|${goal}`).digest("hex");
-      const call = await deps.dial.placeCall({
-        to,
-        // Task calls go out from the family line so the elder line stays free.
-        fromNumber: deps.lines.family,
-        outboundInstruction: businessCallInstruction(elder.name, goal),
-        maxCallDurationSeconds: 600,
-        idempotencyKey,
-      });
-      const callId = (call as { call?: { id?: string } }).call?.id;
-      await store.addTaskStep({
-        taskId,
-        executor: "dial_call",
-        status: "placed",
-        dialCallId: callId,
+      // Nonna has one number and one line: calls are queued, emergencies first, and kept short
+      // so the elder can get through.
+      const { position } = deps.line.enqueue({
+        priority: "task",
+        input: {
+          to,
+          fromNumber: deps.lines.family,
+          outboundInstruction: businessCallInstruction(elder.name, goal),
+          maxCallDurationSeconds: BUSINESS_CALL_MAX_SECONDS,
+          idempotencyKey,
+        },
+        onPlaced: (callId) =>
+          store.addTaskStep({
+            taskId,
+            executor: "dial_call",
+            status: "placed",
+            dialCallId: callId,
+          }),
+        onFailed: (err) =>
+          store.addTaskStep({
+            taskId,
+            executor: "dial_call",
+            status: "failed",
+            result: String(err),
+          }),
       });
       await store.audit({ actor: "omb", action: "dial_call_business", taskId });
       return ok({
-        callId,
-        note: "The call is under way. Its transcript will be posted to this channel when it ends.",
+        status: position === 0 ? "calling" : "queued",
+        position,
+        note: "The call runs when Nonna's line is free. Its transcript is posted to this channel when it ends; don't place the same call again.",
       });
     },
   );

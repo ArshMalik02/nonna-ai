@@ -18,6 +18,7 @@ export interface AppDeps {
   onUnknownGroup?: (groupId: string) => void;
   onInbound?: (msg: InboundMessage) => void;
   onCallFinished?: (callId: string) => void;
+  onCallEnded?: (ended: { callId: string; status: string; durationSeconds: number | null }) => void;
   /** Serves /mcp/tools for OpenMausBot when provided. */
   tools?: Omit<ToolsMcpDeps, "store" | "log"> | undefined;
 }
@@ -39,6 +40,7 @@ export function createApp(deps: AppDeps) {
       onUnknownGroup: deps.onUnknownGroup ?? (() => {}),
       onInbound: deps.onInbound ?? (() => {}),
       onCallFinished: deps.onCallFinished ?? (() => {}),
+      onCallEnded: deps.onCallEnded ?? (() => {}),
     }),
   );
   app.route(

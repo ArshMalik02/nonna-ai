@@ -82,8 +82,21 @@ export class DialClient {
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
     if (!res.ok) {
-      throw new Error(`Dial ${method} ${path} failed: ${res.status} ${await res.text()}`);
+      throw new DialHttpError(
+        res.status,
+        `Dial ${method} ${path} failed: ${res.status} ${await res.text()}`,
+      );
     }
     return (await res.json()) as unknown;
+  }
+}
+
+/** A definite HTTP answer from Dial. 429 on a call means the number is already on a call. */
+export class DialHttpError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
   }
 }

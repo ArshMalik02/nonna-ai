@@ -28,6 +28,8 @@ export interface WebhookDeps {
   onUnknownGroup: (groupId: string) => void;
   /** A call has a transcript, or an outbound call ended without connecting. */
   onCallFinished: (callId: string) => void;
+  /** Every call.ended, so the single-line call queue knows the line is free. */
+  onCallEnded: (ended: { callId: string; status: string; durationSeconds: number | null }) => void;
   /** Every message from a known elder or family member, after the safety check. */
   onInbound: (msg: InboundMessage) => void;
   now?: () => number;
@@ -65,7 +67,19 @@ export function dialWebhookRoutes(deps: WebhookDeps) {
     deps.log.info("dial event", { eventId, type: event.type });
 
     if (event.type === "call.transcribed" || event.type === "call.ended") {
-      const data = event.data as { callId?: string; direction?: string; status?: string };
+      const data = event.data as {
+        callId?: string;
+        direction?: string;
+        status?: string;
+        durationSeconds?: number | null;
+      };
+      if (event.type === "call.ended" && data.callId) {
+        deps.onCallEnded({
+          callId: data.callId,
+          status: data.status ?? "unknown",
+          durationSeconds: data.durationSeconds ?? null,
+        });
+      }
       // Transcribed calls carry the full story. A call that never connected has no transcript,
       // so report outbound ones (a clinic that didn't pick up) when they end.
       const finishedWithoutTranscript =

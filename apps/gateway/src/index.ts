@@ -1,5 +1,6 @@
 import { serve } from "@hono/node-server";
 import { createApp } from "./app.js";
+import { createCallLine } from "./calls/line.js";
 import { handleCallFinished } from "./calls/results.js";
 import { DarwinClient } from "./darwin/client.js";
 import { createDarwinExecutor } from "./darwin/executor.js";
@@ -21,6 +22,8 @@ const log = createLogger(env.LOG_LEVEL);
 const store = new DrizzleStore(createDb(env.DATABASE_URL));
 const dial = new DialClient({ baseUrl: env.DIAL_API_URL, apiKey: env.DIAL_API_KEY });
 const dialLines = { elder: env.DIAL_ELDER_NUMBER, family: env.DIAL_FAMILY_NUMBER };
+// One Dial number carries one call at a time: every outbound call goes through this queue.
+const line = createCallLine({ dial, log });
 const darwinClient = new DarwinClient({
   baseUrl: env.DARWIN_API_URL,
   searchKey: env.DARWIN_SEARCH_KEY,
@@ -76,7 +79,7 @@ const app = createApp({
       const elder = await store.getElder(elderId);
       if (!elder) return;
       const circle = await store.listCircle(elderId);
-      await escalate({ dial, log, lines: dialLines }, elder, circle, { groupId, trigger });
+      await escalate({ dial, line, log, lines: dialLines }, elder, circle, { groupId, trigger });
     }),
   onUnknownGroup: runDiscovery,
   onInbound: (msg) => background("team handoff", () => team.handle(msg)),
@@ -84,7 +87,8 @@ const app = createApp({
     background("call result", () =>
       handleCallFinished({ dial, store, team, lines: dialLines, log }, callId),
     ),
-  tools: { dial, darwin, lines: dialLines, token: env.NONNA_TOOLS_TOKEN },
+  tools: { dial, line, darwin, lines: dialLines, token: env.NONNA_TOOLS_TOKEN },
+  onCallEnded: (ended) => background("call line", () => line.onCallEnded(ended)),
 });
 
 const server = serve({ fetch: app.fetch, port: env.PORT }, (info) =>

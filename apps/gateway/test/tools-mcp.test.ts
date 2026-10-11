@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app.js";
+import { createCallLine } from "../src/calls/line.js";
 import { createDarwinExecutor } from "../src/darwin/executor.js";
 import { proxyDarwin } from "../src/darwin/service.js";
 import { createLogger } from "../src/logger.js";
@@ -19,7 +20,7 @@ function setup() {
   });
   const dial = {
     sendMessage: vi.fn(async () => ({})),
-    placeCall: vi.fn(async () => ({ id: "call_1" })),
+    placeCall: vi.fn(async () => ({ call: { id: "call_1" } })),
     getCall: vi.fn(async () => ({})),
   };
   const app = createApp({
@@ -31,6 +32,7 @@ function setup() {
     escalate: vi.fn(),
     tools: {
       dial,
+      line: createCallLine({ dial, log: createLogger("error") }),
       darwin: createDarwinExecutor({
         darwin: proxyDarwin({ workMs: 0 }),
         store,
@@ -106,12 +108,14 @@ describe("Nonna tools MCP", () => {
     expect(dial.placeCall).toHaveBeenCalledWith(
       expect.objectContaining({ to: "+14155550199", fromNumber: lines.family }),
     );
-    expect(store.steps).toContainEqual(
-      expect.objectContaining({
-        taskId: store.tasks[0]?.id,
-        executor: "dial_call",
-        dialCallId: undefined,
-      }),
+    await vi.waitFor(() =>
+      expect(store.steps).toContainEqual(
+        expect.objectContaining({
+          taskId: store.tasks[0]?.id,
+          executor: "dial_call",
+          dialCallId: "call_1",
+        }),
+      ),
     );
   });
 

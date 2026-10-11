@@ -57,6 +57,27 @@ pnpm dev                      # gateway on http://localhost:8787
 
 Then connect Dial ([`dial/README.md`](dial/README.md)) and OpenMausBot ([`omb/README.md`](omb/README.md)).
 
+### Keep it running (macOS)
+
+```bash
+bash ops/macos/install.sh     # OpenMausBot + gateway + tunnel as login services
+launchctl list | grep ai.nonna
+bash ops/macos/uninstall.sh   # stop and remove
+```
+
+They start at login, restart if they crash, and keep the Mac from idle-sleeping while on power.
+Each tunnel start gets a new public address; the tunnel service re-points Dial at it and restarts
+the gateway by itself. Logs: `apps/gateway/data/logs/`. A closed lid or a shutdown still stops
+Nonna: for always-on, run the same services on a server.
+
+### One phone line
+
+Nonna runs on one Dial number, which carries one call at a time. All outbound calls go through a
+queue ([`calls/line.ts`](apps/gateway/src/calls/line.ts)): emergency calls first, business calls
+capped at 5 minutes, and a busy line (e.g. the elder calling in) is retried. The emergency ladder
+alerts the family group and the elder by iMessage at once, then calls family one at a time,
+nearest first, until someone answers.
+
 To connect Dial to a gateway on your machine (tunnel, webhook, live-call MCP, family group),
 follow [`dial/README.md`](dial/README.md#connecting-dial-to-a-local-gateway).
 
