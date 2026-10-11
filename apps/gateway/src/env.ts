@@ -10,8 +10,10 @@ const Env = z.object({
   DIAL_API_URL: z.url().default("https://api.getdial.ai"),
   DIAL_API_KEY: z.string().min(1),
   DIAL_WEBHOOK_SECRET: z.string().min(1),
-  DIAL_FRONT_DOOR_NUMBER: z.string().min(1),
-  DIAL_WORKER_NUMBER: z.string().min(1),
+  /** SMS + voice. The only number the elder texts and calls. */
+  DIAL_ELDER_NUMBER: z.string().regex(/^\+[1-9]\d{6,14}$/),
+  /** iMessage + voice. In the family group; places outbound task calls. */
+  DIAL_FAMILY_NUMBER: z.string().regex(/^\+[1-9]\d{6,14}$/),
 
   DARWIN_API_URL: z.url().default("https://api.darwin.so"),
   DARWIN_SEARCH_KEY: z.string().optional(),

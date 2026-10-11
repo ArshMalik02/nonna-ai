@@ -9,6 +9,13 @@ loop over iMessage, and escalates to real people when something is wrong.
 - **[OpenMausBot](https://github.com/milind-soni/OpenMausBot)** runs the agent team, unmodified.
 - **This repo** is the glue: the gateway, the safety rules, the task engine and the team definition.
 
+### Two numbers, two audiences
+
+| Line | Dial capabilities | Who uses it |
+| --- | --- | --- |
+| **Elder line** | SMS + voice | The elder: the one number they text and call. Nonna never places task calls from it, so it is always free for them. |
+| **Family line** | iMessage + voice | The family iMessage group (a family member creates the group and adds this number), direct iMessages from family, and Nonna's outbound task calls (clinic, cab company, family alerts). |
+
 Read [`docs/architecture.md`](docs/architecture.md) and [`docs/build-plan.md`](docs/build-plan.md) first.
 
 ```

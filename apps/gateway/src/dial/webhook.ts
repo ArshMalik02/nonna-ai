@@ -3,12 +3,14 @@ import { Hono } from "hono";
 import type { Logger } from "../logger.js";
 import { detectEmergency } from "../safety/rules.js";
 import type { Store } from "../store.js";
+import { type DialLines, routeInbound } from "./lines.js";
 import { verifyDialSignature } from "./signature.js";
 
 export interface WebhookDeps {
   store: Store;
   log: Logger;
   secret: string;
+  lines: DialLines;
   /** Fired (not awaited) for emergencies so the webhook still acks within Dial's timeout. */
   onEmergency: (args: { elderId: string; groupId?: string | undefined; trigger: string }) => void;
   now?: () => number;
@@ -48,20 +50,29 @@ export function dialWebhookRoutes(deps: WebhookDeps) {
     if (event.type === "message.received") {
       const msg = DialMessageReceived.safeParse(event.data);
       if (!msg.success || msg.data.source !== "external") return c.json({ ok: true });
-      const { from, groupId, body } = msg.data;
+      const { from, body } = msg.data;
+      const route = routeInbound(msg.data, deps.lines);
 
-      const elder = groupId
-        ? await deps.store.findElderByGroupId(groupId)
-        : await deps.store.findElderByPhone(from);
+      // Elder line: the sender is the elder. Family line: the sender is a circle member, or the
+      // message came through the family group.
+      const elder =
+        route.line === "elder"
+          ? await deps.store.findElderByPhone(from)
+          : route.line === "family" && route.kind === "group"
+            ? await deps.store.findElderByGroupId(route.groupId)
+            : route.line === "family"
+              ? await deps.store.findElderByCircleMemberPhone(from)
+              : undefined;
       if (!elder) {
-        deps.log.warn("message from unknown sender", { eventId });
+        deps.log.warn("message from unknown sender", { eventId, line: route.line });
         return c.json({ ok: true });
       }
+      const groupId = route.line === "family" && route.kind === "group" ? route.groupId : undefined;
 
       const safety = detectEmergency(body);
       if (safety.emergency) {
         await deps.store.audit({ actor: "safety", action: "emergency_detected", detail: eventId });
-        deps.onEmergency({ elderId: elder.id, groupId: groupId ?? undefined, trigger: "message" });
+        deps.onEmergency({ elderId: elder.id, groupId, trigger: `${route.line} message` });
         return c.json({ ok: true, escalated: true });
       }
 

@@ -46,6 +46,16 @@ export class DrizzleStore implements Store {
     return row ? toElder(row.elder) : undefined;
   }
 
+  async findElderByCircleMemberPhone(phone: string) {
+    const [row] = await this.db
+      .select({ elder: elders })
+      .from(circleMembers)
+      .innerJoin(elders, eq(circleMembers.elderId, elders.id))
+      .where(eq(circleMembers.phone, phone))
+      .limit(1);
+    return row ? toElder(row.elder) : undefined;
+  }
+
   async getElder(id: string) {
     const [row] = await this.db.select().from(elders).where(eq(elders.id, id)).limit(1);
     return row ? toElder(row) : undefined;

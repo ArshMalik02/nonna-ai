@@ -5,8 +5,14 @@ import { createLogger } from "../src/logger.js";
 import { MemoryStore } from "../src/store.js";
 
 const secret = "whsec_test";
+const dialLines = { elder: "+17852688267", family: "+12134764803" };
 
-function event(id: string, body: string, from = "+14155550123") {
+function event(
+  id: string,
+  body: string,
+  from = "+14155550123",
+  { to = dialLines.elder as string | null, groupId = null as string | null } = {},
+) {
   return JSON.stringify({
     id,
     object: "event",
@@ -17,8 +23,8 @@ function event(id: string, body: string, from = "+14155550123") {
     data: {
       messageId: "msg_1",
       from,
-      to: "+14155550100",
-      groupId: null,
+      to,
+      groupId,
       channel: "imessage",
       body,
       media: [],
@@ -48,8 +54,26 @@ describe("POST /webhooks/dial", () => {
       timezone: "America/Los_Angeles",
       language: "en",
     });
+    store.circle.push({
+      id: "m1",
+      elderId: "e1",
+      name: "Anna Lee",
+      phone: "+14155550124",
+      relation: "daughter",
+      priority: 0,
+      canApprove: true,
+      canPay: true,
+      isNearby: false,
+    });
+    store.groups.set("grp_family", "e1");
     escalate = vi.fn<AppDeps["escalate"]>();
-    app = createApp({ store, log: createLogger("error"), dialWebhookSecret: secret, escalate });
+    app = createApp({
+      store,
+      log: createLogger("error"),
+      dialWebhookSecret: secret,
+      dialLines,
+      escalate,
+    });
   });
 
   it("rejects an unsigned request", async () => {
@@ -69,6 +93,30 @@ describe("POST /webhooks/dial", () => {
     expect(escalate).toHaveBeenCalledWith(expect.objectContaining({ elderId: "e1" }));
   });
 
+  it("escalates from the family iMessage group and alerts that group", async () => {
+    await post(
+      event("evt_5", "Mom fell, she can't get up", "+14155550124", {
+        to: null,
+        groupId: "grp_family",
+      }),
+    );
+    expect(escalate).toHaveBeenCalledWith(
+      expect.objectContaining({ elderId: "e1", groupId: "grp_family" }),
+    );
+  });
+
+  it("matches a direct iMessage to the family line to the member's elder", async () => {
+    await post(event("evt_6", "I think dad fell", "+14155550124", { to: dialLines.family }));
+    expect(escalate).toHaveBeenCalledWith(
+      expect.objectContaining({ elderId: "e1", trigger: "family message" }),
+    );
+  });
+
+  it("does not treat a family member texting the elder line as the elder", async () => {
+    await post(event("evt_7", "I fell", "+14155550124", { to: dialLines.elder }));
+    expect(escalate).not.toHaveBeenCalled();
+  });
+
   it("ignores unknown senders", async () => {
     await post(event("evt_4", "I fell", "+19998887777"));
     expect(escalate).not.toHaveBeenCalled();
@@ -81,6 +129,7 @@ describe("context MCP auth", () => {
       store: new MemoryStore(),
       log: createLogger("error"),
       dialWebhookSecret: secret,
+      dialLines,
       escalate: vi.fn(),
     });
     const res = await app.request("/mcp/context", {
@@ -105,6 +154,7 @@ describe("context MCP tools", () => {
       store,
       log: createLogger("error"),
       dialWebhookSecret: secret,
+      dialLines,
       escalate: vi.fn(),
     });
     const res = await app.request("/mcp/context", {

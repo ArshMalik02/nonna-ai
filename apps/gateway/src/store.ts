@@ -16,6 +16,8 @@ export interface Store {
   recordInboundEvent(event: { id: string; type: string; receivedAt: Date }): Promise<boolean>;
   findElderByPhone(phone: string): Promise<Elder | undefined>;
   findElderByGroupId(groupId: string): Promise<Elder | undefined>;
+  /** For direct iMessages to the family line: which elder does this family member belong to? */
+  findElderByCircleMemberPhone(phone: string): Promise<Elder | undefined>;
   getElder(id: string): Promise<Elder | undefined>;
   listCircle(elderId: string): Promise<CircleMember[]>;
   createTask(input: NewTask): Promise<Task>;
@@ -41,6 +43,10 @@ export class MemoryStore implements Store {
   async findElderByGroupId(groupId: string) {
     const elderId = this.groups.get(groupId);
     return elderId ? this.elders.get(elderId) : undefined;
+  }
+  async findElderByCircleMemberPhone(phone: string) {
+    const member = this.circle.find((m) => m.phone === phone);
+    return member ? this.elders.get(member.elderId) : undefined;
   }
   async getElder(id: string) {
     return this.elders.get(id);

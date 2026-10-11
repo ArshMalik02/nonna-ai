@@ -11,17 +11,19 @@ const env = loadEnv();
 const log = createLogger(env.LOG_LEVEL);
 const store = new DrizzleStore(createDb(env.DATABASE_URL));
 const dial = new DialClient({ baseUrl: env.DIAL_API_URL, apiKey: env.DIAL_API_KEY });
+const dialLines = { elder: env.DIAL_ELDER_NUMBER, family: env.DIAL_FAMILY_NUMBER };
 
 const app = createApp({
   store,
   log,
   dialWebhookSecret: env.DIAL_WEBHOOK_SECRET,
+  dialLines,
   escalate: ({ elderId, groupId, trigger }) => {
     void (async () => {
       const elder = await store.getElder(elderId);
       if (!elder) return;
       const circle = await store.listCircle(elderId);
-      await escalate({ dial, log, workerNumber: env.DIAL_WORKER_NUMBER }, elder, circle, {
+      await escalate({ dial, log, lines: dialLines }, elder, circle, {
         groupId,
         trigger,
       });
