@@ -79,7 +79,12 @@ export class ChannelRelay {
   }
 
   async #watch() {
-    const { pollMs = 2_000, maxTurnMs = 10 * 60_000, lingerMs = 0, sleep = defaultSleep } = this.deps;
+    const {
+      pollMs = 2_000,
+      maxTurnMs = 10 * 60_000,
+      lingerMs = 0,
+      sleep = defaultSleep,
+    } = this.deps;
     const deadline = Date.now() + maxTurnMs;
     let idlePolls = 0;
     let lastActivity = Date.now();
