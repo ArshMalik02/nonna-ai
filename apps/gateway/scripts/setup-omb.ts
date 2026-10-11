@@ -1,8 +1,10 @@
 /**
  * Sets up the Nonna team in a running OpenMausBot harness (unmodified, see docs/build-plan.md §4):
  *  1. registers the gateway's /mcp/tools as the "nonna" MCP server (token-protected) and enables it
- *  2. creates (or updates) the "Nonna" chief bot: Claude, no computer access, Nonna tools pre-allowed
- *  3. creates (or updates) one channel per elder that has a family group, and links them
+ *  2. creates (or updates) the "Nonna" chief bot: Claude, no computer access, Chief of Staff
+ *  3. creates (or updates) the specialists Rides and Appointments in Nonna's team; Nonna hands
+ *     them work, they are not in the family channel, so only Nonna talks to the family
+ *  4. creates (or updates) one channel per elder that has a family group, and links them
  *
  * Safe to re-run. The gateway must be running with NONNA_TOOLS_TOKEN loaded: on first run the
  * token is created and the script stops; restart the gateway and run it again.
@@ -24,6 +26,12 @@ const OMB = process.env.OMB_API_URL ?? "http://127.0.0.1:8899";
 const GATEWAY = `http://127.0.0.1:${process.env.PORT ?? "8787"}`;
 const MCP_NAME = NONNA_MCP_SERVER;
 const BOT_NAME = "Nonna";
+/** Nonna and her specialists share this OpenMausBot team, so Nonna can hand them work. */
+const TEAM = "Nonna";
+const SPECIALISTS = [
+  { name: "Rides", title: "Transport", prompt: "rides.md" },
+  { name: "Appointments", title: "Doctor, pharmacy and lab visits", prompt: "appointments.md" },
+] as const;
 const MODEL = { instanceId: "claude", model: process.env.NONNA_MODEL ?? "claude-sonnet-5-5" };
 
 const token = process.env.NONNA_TOOLS_TOKEN;
@@ -84,11 +92,15 @@ if (!bot) {
     description: prompt,
     modelSelection: MODEL,
     requireAvailableModel: true,
+    section: TEAM,
   });
   bot = created.bot;
 }
 await omb("PATCH", `/api/bots/${bot.id}`, {
   description: prompt,
+  section: TEAM,
+  // Lets Nonna hand rides and appointments to the specialists below.
+  chiefOfStaff: true,
   // Nonna acts only through its tools: no shell, files or screen on this machine.
   computer: "off",
   // Approval cards for Nonna's own tools are answered by the gateway (omb/relay.ts).
@@ -96,7 +108,34 @@ await omb("PATCH", `/api/bots/${bot.id}`, {
 });
 process.stdout.write(`Bot "${BOT_NAME}": ${bot.id}\n`);
 
-// 3. One channel per elder with a family group.
+// 3. The specialists. They work in their own conversations that Nonna opens, never in the family
+// channel, so their messages never reach the family. Nobody watches those conversations to
+// answer approval cards, so they run on "auto" with no computer and only the Nonna tools.
+for (const spec of SPECIALISTS) {
+  const specPrompt = readFileSync(resolve(ROOT, "omb/prompts", spec.prompt), "utf8");
+  let specBot = fleet.bots.find((b) => b.name === spec.name);
+  if (!specBot) {
+    const created = await omb<{ bot: { id: string; name: string } }>("POST", "/api/bots", {
+      name: spec.name,
+      title: spec.title,
+      description: specPrompt,
+      modelSelection: MODEL,
+      requireAvailableModel: true,
+      section: TEAM,
+    });
+    specBot = created.bot;
+  }
+  await omb("PATCH", `/api/bots/${specBot.id}`, {
+    description: specPrompt,
+    section: TEAM,
+    computer: "off",
+    mcpServers: [MCP_NAME],
+    approvalMode: "auto",
+  });
+  process.stdout.write(`Specialist "${spec.name}": ${specBot.id}\n`);
+}
+
+// 4. One channel per elder with a family group.
 const db = createDb(process.env.DATABASE_URL ?? "file:./data/nonna.db");
 fleet = await omb<Fleet>("GET", "/api/bots?messages=0");
 for (const elder of await db.select().from(elders)) {

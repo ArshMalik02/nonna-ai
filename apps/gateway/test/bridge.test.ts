@@ -54,6 +54,8 @@ function setup({ confirmed }: { confirmed: boolean }) {
     lines,
     log: createLogger("error"),
     pollMs: 1,
+    // Tests stop as soon as the channel settles instead of lingering for late reports.
+    lingerMs: 0,
   });
   return { omb, dial, handle: bridge.handle, bridge, lines };
 }
