@@ -31,9 +31,9 @@ Elder (call / iMessage) ─► Dial ─► webhooks ─► nonna-gateway ─► 
 | `apps/gateway` | Hono + TypeScript server: Dial webhooks (HMAC verify, dedupe), live-call Context MCP, safety rules, task state machine, DB |
 | `packages/shared` | Zod schemas and types shared across the repo (Elder, Task, Dial events) |
 | `packages/nonna-tools-mcp` | Tool contract for the MCP server that OMB bots call |
-| `omb/` | OpenMausBot team package and bot prompts (data, not a fork) |
+| `omb/` | OpenMausBot team, prompts and setup guide (data, not a fork) |
 | `dial/` | Front-door voice instruction and outbound call templates |
-| `scripts/` | Seed and provisioning scripts |
+| `apps/gateway/scripts` | Ops scripts: seed, add family, connect Dial, set up OpenMausBot |
 | `docs/` | Architecture and build plan |
 
 ## Getting started
@@ -47,6 +47,8 @@ pnpm db:migrate               # create the local SQLite database
 pnpm seed                     # fake demo elder + family
 pnpm dev                      # gateway on http://localhost:8787
 ```
+
+Then connect Dial ([`dial/README.md`](dial/README.md)) and OpenMausBot ([`omb/README.md`](omb/README.md)).
 
 To connect Dial to a gateway on your machine (tunnel, webhook, live-call MCP, family group),
 follow [`dial/README.md`](dial/README.md#connecting-dial-to-a-local-gateway).

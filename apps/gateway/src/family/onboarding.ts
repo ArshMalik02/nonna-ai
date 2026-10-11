@@ -46,17 +46,17 @@ export async function discoverGroups({ dial, store, log }: OnboardingDeps) {
   }
 }
 
-/** Handles a non-emergency message in a family group. For now: the onboarding OK. */
+/**
+ * Handles a message in a family group that has not confirmed yet. Returns true when the message
+ * was part of onboarding (so it should not go on to the team).
+ */
 export async function handleFamilyGroupMessage(
   { dial, store, log }: OnboardingDeps,
   msg: { groupId: string; elderId: string; body: string },
-) {
+): Promise<boolean> {
   const group = await store.getFamilyGroup(msg.groupId);
-  if (!group || group.confirmedAt) {
-    // TODO(phase 1): hand off to the OMB family channel / task engine.
-    return;
-  }
-  if (parseApprovalReply(msg.body) !== "yes") return;
+  if (!group || group.confirmedAt) return false;
+  if (parseApprovalReply(msg.body) !== "yes") return true;
 
   const elder = await store.getElder(msg.elderId);
   await store.confirmFamilyGroup(msg.groupId);
@@ -66,4 +66,5 @@ export async function handleFamilyGroupMessage(
     body: confirmedMessage(elder?.name ?? "your family member"),
   });
   log.info("family group confirmed", { groupId: msg.groupId });
+  return true;
 }

@@ -19,7 +19,8 @@
     "db:migrate": "pnpm --filter @nonna/gateway db:migrate",
     "seed": "pnpm --filter @nonna/gateway seed",
     "family:add": "pnpm --filter @nonna/gateway family:add",
-    "dial:connect": "pnpm --filter @nonna/gateway dial:connect"
+    "dial:connect": "pnpm --filter @nonna/gateway dial:connect",
+    "omb:setup": "pnpm --filter @nonna/gateway omb:setup"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",

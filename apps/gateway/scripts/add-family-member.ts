@@ -7,8 +7,8 @@
  */
 import { randomUUID } from "node:crypto";
 import { parseArgs } from "node:util";
-import { createDb } from "../apps/gateway/src/db/client.js";
-import { circleMembers, elders } from "../apps/gateway/src/db/schema.js";
+import { createDb } from "../src/db/client.js";
+import { circleMembers, elders } from "../src/db/schema.js";
 
 const { values: a } = parseArgs({
   options: {

@@ -3,8 +3,8 @@
  * Add family with `pnpm family:add` (stored only in your local database).
  * Usage: pnpm db:migrate && pnpm seed
  */
-import { createDb } from "../apps/gateway/src/db/client.js";
-import { elders } from "../apps/gateway/src/db/schema.js";
+import { createDb } from "../src/db/client.js";
+import { elders } from "../src/db/schema.js";
 
 const db = createDb(process.env.DATABASE_URL ?? "file:./data/nonna.db");
 

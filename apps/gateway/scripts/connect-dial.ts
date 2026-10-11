@@ -13,7 +13,7 @@ import { randomBytes } from "node:crypto";
 import { resolve } from "node:path";
 import { setEnvVar } from "./env-file.js";
 
-const ENV_PATH = resolve(import.meta.dirname, "../.env");
+const ENV_PATH = resolve(import.meta.dirname, "../../../.env");
 const MCP_NAME = "nonna-context";
 const WEBHOOK_PATH = "/webhooks/dial";
 

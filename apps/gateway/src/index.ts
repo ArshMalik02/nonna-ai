@@ -1,11 +1,14 @@
 import { serve } from "@hono/node-server";
 import { createApp } from "./app.js";
+import { DarwinClient } from "./darwin/client.js";
 import { createDb } from "./db/client.js";
 import { DrizzleStore } from "./db/drizzle-store.js";
 import { DialClient } from "./dial/client.js";
 import { loadEnv } from "./env.js";
-import { discoverGroups, handleFamilyGroupMessage } from "./family/onboarding.js";
+import { discoverGroups } from "./family/onboarding.js";
 import { createLogger } from "./logger.js";
+import { createTeamBridge } from "./omb/bridge.js";
+import { OmbClient } from "./omb/client.js";
 import { escalate } from "./safety/escalate.js";
 
 const env = loadEnv();
@@ -13,6 +16,14 @@ const log = createLogger(env.LOG_LEVEL);
 const store = new DrizzleStore(createDb(env.DATABASE_URL));
 const dial = new DialClient({ baseUrl: env.DIAL_API_URL, apiKey: env.DIAL_API_KEY });
 const dialLines = { elder: env.DIAL_ELDER_NUMBER, family: env.DIAL_FAMILY_NUMBER };
+const darwin = new DarwinClient({
+  baseUrl: env.DARWIN_API_URL,
+  searchKey: env.DARWIN_SEARCH_KEY,
+  actKey: env.DARWIN_ACT_KEY,
+  actEnabled: env.DARWIN_ACT_ENABLED,
+});
+const omb = new OmbClient({ baseUrl: env.OMB_API_URL, token: env.OMB_API_TOKEN });
+const toTeam = createTeamBridge({ store, dial, omb, log });
 
 /** Run background work without blocking the webhook ack; never let it crash the process. */
 const background = (name: string, work: () => Promise<unknown>) => {
@@ -45,8 +56,8 @@ const app = createApp({
       await escalate({ dial, log, lines: dialLines }, elder, circle, { groupId, trigger });
     }),
   onUnknownGroup: runDiscovery,
-  onFamilyGroupMessage: (msg) =>
-    background("family message", () => handleFamilyGroupMessage({ dial, store, log }, msg)),
+  onInbound: (msg) => background("team handoff", () => toTeam(msg)),
+  tools: { dial, darwin, lines: dialLines, token: env.NONNA_TOOLS_TOKEN },
 });
 
 const server = serve({ fetch: app.fetch, port: env.PORT }, (info) =>

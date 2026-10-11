@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { CircleMember, Elder, Task, TaskKind } from "@nonna/shared";
+import type { CircleMember, Elder, Task, TaskKind, TaskStatus } from "@nonna/shared";
 
 export interface NewTask {
   elderId: string;
@@ -12,6 +12,8 @@ export interface FamilyGroup {
   elderId: string;
   /** Set when a family member replies OK to Nonna's welcome message. */
   confirmedAt?: Date | undefined;
+  /** The OpenMausBot channel this family's conversation is relayed to. */
+  ombChannelId?: string | undefined;
 }
 
 /**
@@ -33,7 +35,12 @@ export interface Store {
   getFamilyGroup(dialGroupId: string): Promise<FamilyGroup | undefined>;
   bindFamilyGroup(dialGroupId: string, elderId: string): Promise<void>;
   confirmFamilyGroup(dialGroupId: string): Promise<void>;
+  setFamilyGroupChannel(dialGroupId: string, ombChannelId: string): Promise<void>;
+  listFamilyGroups(elderId: string): Promise<FamilyGroup[]>;
   createTask(input: NewTask): Promise<Task>;
+  getTask(id: string): Promise<Task | undefined>;
+  listOpenTasks(elderId: string): Promise<Task[]>;
+  setTaskStatus(id: string, status: TaskStatus): Promise<void>;
   audit(entry: { actor: string; action: string; taskId?: string; detail?: string }): Promise<void>;
 }
 
@@ -76,6 +83,24 @@ export class MemoryStore implements Store {
   async confirmFamilyGroup(dialGroupId: string) {
     const g = this.groups.get(dialGroupId);
     if (g) g.confirmedAt = new Date();
+  }
+  async setFamilyGroupChannel(dialGroupId: string, ombChannelId: string) {
+    const g = this.groups.get(dialGroupId);
+    if (g) g.ombChannelId = ombChannelId;
+  }
+  async listFamilyGroups(elderId: string) {
+    return [...this.groups.values()].filter((g) => g.elderId === elderId);
+  }
+  async getTask(id: string) {
+    return this.tasks.find((t) => t.id === id);
+  }
+  async listOpenTasks(elderId: string) {
+    const done = new Set(["closed", "failed", "cancelled"]);
+    return this.tasks.filter((t) => t.elderId === elderId && !done.has(t.status));
+  }
+  async setTaskStatus(id: string, status: TaskStatus) {
+    const t = this.tasks.find((x) => x.id === id);
+    if (t) t.status = status;
   }
   async createTask(input: NewTask) {
     const task: Task = { id: randomUUID(), status: "received", priority: 0, ...input };

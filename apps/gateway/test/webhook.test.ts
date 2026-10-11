@@ -119,8 +119,8 @@ describe("POST /webhooks/dial", () => {
     expect(escalate).not.toHaveBeenCalled();
   });
 
-  it("passes non-emergency family group messages on", async () => {
-    const onFamilyGroupMessage = vi.fn();
+  it("passes family group messages on to the team", async () => {
+    const onInbound = vi.fn();
     app = createApp({
       store,
       log: createLogger("error"),
@@ -128,13 +128,16 @@ describe("POST /webhooks/dial", () => {
       dialLines,
       contextMcpToken,
       escalate,
-      onFamilyGroupMessage,
+      onInbound,
     });
     await post(event("evt_8", "OK", "grandkid@example.com", { to: null, groupId: "grp_family" }));
-    expect(onFamilyGroupMessage).toHaveBeenCalledWith({
-      groupId: "grp_family",
+    expect(onInbound).toHaveBeenCalledWith({
       elderId: "e1",
+      source: "family_group",
+      from: "grandkid@example.com",
       body: "OK",
+      groupId: "grp_family",
+      escalated: false,
     });
   });
 

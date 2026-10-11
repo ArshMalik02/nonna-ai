@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import type { CircleMember, Elder, Task } from "@nonna/shared";
-import { asc, eq, or } from "drizzle-orm";
+import { type CircleMember, type Elder, type Task, TaskStatus } from "@nonna/shared";
+import { and, asc, eq, notInArray, or } from "drizzle-orm";
 import type { FamilyGroup, NewTask, Store } from "../store.js";
 import type { Db } from "./client.js";
 import { auditLog, circleMembers, elders, familyGroups, inboundEvents, tasks } from "./schema.js";
@@ -24,6 +24,25 @@ const toMember = ({ imessageHandle, phone, ...r }: MemberRow): CircleMember => (
   ...r,
   ...(phone ? { phone } : {}),
   ...(imessageHandle ? { imessageHandle } : {}),
+});
+
+const toGroup = (r: typeof familyGroups.$inferSelect): FamilyGroup => ({
+  dialGroupId: r.dialGroupId,
+  elderId: r.elderId,
+  confirmedAt: r.confirmedAt ?? undefined,
+  ombChannelId: r.ombChannelId ?? undefined,
+});
+
+const toTask = (r: typeof tasks.$inferSelect): Task => ({
+  id: r.id,
+  elderId: r.elderId,
+  kind: r.kind,
+  status: TaskStatus.parse(r.status),
+  summary: r.summary,
+  priority: r.priority,
+  ...(r.ownerBot ? { ownerBot: r.ownerBot } : {}),
+  ...(r.dueAt ? { dueAt: r.dueAt.toISOString() } : {}),
+  ...(r.ombThreadId ? { ombThreadId: r.ombThreadId } : {}),
 });
 
 export class DrizzleStore implements Store {
@@ -79,13 +98,41 @@ export class DrizzleStore implements Store {
       .from(familyGroups)
       .where(eq(familyGroups.dialGroupId, dialGroupId))
       .limit(1);
-    return row
-      ? {
-          dialGroupId: row.dialGroupId,
-          elderId: row.elderId,
-          confirmedAt: row.confirmedAt ?? undefined,
-        }
-      : undefined;
+    return row ? toGroup(row) : undefined;
+  }
+
+  async setFamilyGroupChannel(dialGroupId: string, ombChannelId: string) {
+    await this.db
+      .update(familyGroups)
+      .set({ ombChannelId })
+      .where(eq(familyGroups.dialGroupId, dialGroupId));
+  }
+
+  async listFamilyGroups(elderId: string) {
+    const rows = await this.db.select().from(familyGroups).where(eq(familyGroups.elderId, elderId));
+    return rows.map(toGroup);
+  }
+
+  async getTask(id: string) {
+    const [row] = await this.db.select().from(tasks).where(eq(tasks.id, id)).limit(1);
+    return row ? toTask(row) : undefined;
+  }
+
+  async listOpenTasks(elderId: string) {
+    const rows = await this.db
+      .select()
+      .from(tasks)
+      .where(
+        and(
+          eq(tasks.elderId, elderId),
+          notInArray(tasks.status, ["closed", "failed", "cancelled"]),
+        ),
+      );
+    return rows.map(toTask);
+  }
+
+  async setTaskStatus(id: string, status: TaskStatus) {
+    await this.db.update(tasks).set({ status }).where(eq(tasks.id, id));
   }
 
   async bindFamilyGroup(dialGroupId: string, elderId: string) {

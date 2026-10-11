@@ -1,51 +1,66 @@
-import { TaskKind, TaskStatus } from "@nonna/shared";
+import { Phone, TaskKind, TaskStatus } from "@nonna/shared";
 import { z } from "zod";
 
 /**
- * Tool contract for the Nonna team bots (docs/build-plan.md §5.1).
- * The gateway implements these; omb/nonna-team.md grants them per bot.
+ * Tool contract for the Nonna team bots (docs/build-plan.md §5.1). The gateway serves these at
+ * /mcp/tools; omb/nonna-team.md grants them per bot.
+ *
+ * There is deliberately no "message the family" tool: everything the bot writes in its OMB
+ * channel is relayed to the family iMessage group, so a reply is simply a reply.
  */
 export const nonnaTools = {
   get_elder_profile: {
-    description: "Get the elder's profile, preferences and care notes.",
+    description:
+      "Get the elder's profile: name, address, timezone, language, preferences, care notes.",
     input: z.object({ elderId: z.string() }),
   },
+  list_family: {
+    description:
+      "List the elder's family circle: names, relation, who can approve plans and who can pay.",
+    input: z.object({ elderId: z.string() }),
+  },
+  list_open_tasks: {
+    description: "List the elder's open tasks and their status.",
+    input: z.object({ elderId: z.string() }),
+  },
+  create_task: {
+    description:
+      "Record a new request (ride, appointment, payment, report, other) before working on it.",
+    input: z.object({ elderId: z.string(), kind: TaskKind, summary: z.string().min(3).max(500) }),
+  },
   update_task: {
-    description: "Move a task to a new status and record what happened.",
+    description:
+      "Move a task to its next status (received → triaged → planned → awaiting_approval → executing → waiting_external → confirmed → elder_notified → closed; or failed/escalated/cancelled).",
     input: z.object({ taskId: z.string(), status: TaskStatus, note: z.string().max(1000) }),
   },
-  message_family: {
-    description: "Send one clear message to the family iMessage group.",
-    input: z.object({ elderId: z.string(), body: z.string().max(1500) }),
-  },
   message_elder: {
-    description: "Send a short, warm message to the elder.",
-    input: z.object({ elderId: z.string(), body: z.string().max(600) }),
-  },
-  request_family_approval: {
-    description: "Ask a member who can approve a YES/NO question about a task.",
-    input: z.object({ taskId: z.string(), question: z.string().max(500) }),
-  },
-  schedule_reminder: {
-    description: "Schedule an iMessage (call as backup) reminder for the elder.",
-    input: z.object({
-      taskId: z.string(),
-      fireAt: z.iso.datetime(),
-      text: z.string().max(300),
-    }),
+    description:
+      "Text the elder (SMS from the elder line). Short, warm, plain words. Use for confirmations and reminders.",
+    input: z.object({ elderId: z.string(), body: z.string().min(1).max(600) }),
   },
   darwin_search: {
-    description: "Find an outside agent that can do this task.",
-    input: z.object({ taskId: z.string(), kind: TaskKind, query: z.string().max(500) }),
+    description:
+      "Search Darwin for an outside agent that can do a task (ride, booking, payment). Returns candidates and whether they can be used now.",
+    input: z.object({
+      query: z.string().min(3).max(500),
+      context: z.string().max(1000).optional(),
+    }),
   },
   dial_call_business: {
-    description: "Place an AI phone call from the worker line to a business to get a task done.",
+    description:
+      "Place an AI phone call to a business (clinic, pharmacy, cab company) to get a task done. Only after the family approved the plan. Returns a callId; check it later with get_call_result.",
     input: z.object({
+      elderId: z.string(),
       taskId: z.string(),
-      to: z.string(),
-      goal: z.string().max(1000),
+      to: Phone,
+      goal: z.string().min(10).max(1000),
     }),
+  },
+  get_call_result: {
+    description: "Get the status and transcript of a call placed with dial_call_business.",
+    input: z.object({ callId: z.string() }),
   },
 } as const;
 
 export type NonnaToolName = keyof typeof nonnaTools;
+export type NonnaToolInput<N extends NonnaToolName> = z.infer<(typeof nonnaTools)[N]["input"]>;

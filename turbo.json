@@ -7,7 +7,11 @@
     "DIAL_API_URL",
     "DIAL_API_KEY",
     "PUBLIC_BASE_URL",
-    "CONTEXT_MCP_TOKEN"
+    "CONTEXT_MCP_TOKEN",
+    "OMB_API_URL",
+    "PORT",
+    "NONNA_TOOLS_TOKEN",
+    "NONNA_MODEL"
   ],
   "tasks": {
     "build": {

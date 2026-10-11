@@ -6,6 +6,17 @@ import type { Store } from "../store.js";
 import { type DialLines, routeInbound } from "./lines.js";
 import { verifyDialSignature } from "./signature.js";
 
+export interface InboundMessage {
+  elderId: string;
+  source: "family_group" | "family_direct" | "elder";
+  /** Sender as Dial reports it: E.164 phone or Apple ID email. */
+  from: string;
+  body: string;
+  groupId?: string | undefined;
+  /** True when the safety rules already escalated this message. */
+  escalated: boolean;
+}
+
 export interface WebhookDeps {
   store: Store;
   log: Logger;
@@ -15,8 +26,8 @@ export interface WebhookDeps {
   onEmergency: (args: { elderId: string; groupId?: string | undefined; trigger: string }) => void;
   /** A message arrived from a group we have not bound yet: run group discovery now. */
   onUnknownGroup: (groupId: string) => void;
-  /** A non-emergency message in a bound family group. */
-  onFamilyGroupMessage: (args: { groupId: string; elderId: string; body: string }) => void;
+  /** Every message from a known elder or family member, after the safety check. */
+  onInbound: (msg: InboundMessage) => void;
   now?: () => number;
 }
 
@@ -79,15 +90,22 @@ export function dialWebhookRoutes(deps: WebhookDeps) {
       }
       const groupId = route.line === "family" && route.kind === "group" ? route.groupId : undefined;
 
+      const source = route.line === "elder" ? "elder" : groupId ? "family_group" : "family_direct";
       const safety = detectEmergency(body);
       if (safety.emergency) {
         await deps.store.audit({ actor: "safety", action: "emergency_detected", detail: eventId });
         deps.onEmergency({ elderId: elder.id, groupId, trigger: `${route.line} message` });
-        return c.json({ ok: true, escalated: true });
       }
-
-      if (groupId) deps.onFamilyGroupMessage({ groupId, elderId: elder.id, body });
-      // TODO(phase 1): hand off elder and direct family messages to the OMB channel / task engine.
+      // Safety ran first and never waits on this; the team only hears about it afterwards.
+      deps.onInbound({
+        elderId: elder.id,
+        source,
+        from,
+        body,
+        groupId,
+        escalated: safety.emergency,
+      });
+      if (safety.emergency) return c.json({ ok: true, escalated: true });
     }
 
     return c.json({ ok: true });

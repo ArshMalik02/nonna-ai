@@ -3,8 +3,9 @@ import { HTTPException } from "hono/http-exception";
 import { secureHeaders } from "hono/secure-headers";
 import { contextMcpRoutes } from "./dial/context-mcp.js";
 import type { DialLines } from "./dial/lines.js";
-import { dialWebhookRoutes } from "./dial/webhook.js";
+import { dialWebhookRoutes, type InboundMessage } from "./dial/webhook.js";
 import type { Logger } from "./logger.js";
+import { type ToolsMcpDeps, toolsMcpRoutes } from "./omb/tools-mcp.js";
 import type { Store } from "./store.js";
 
 export interface AppDeps {
@@ -15,7 +16,9 @@ export interface AppDeps {
   contextMcpToken: string | undefined;
   escalate: (args: { elderId: string; groupId?: string | undefined; trigger: string }) => void;
   onUnknownGroup?: (groupId: string) => void;
-  onFamilyGroupMessage?: (args: { groupId: string; elderId: string; body: string }) => void;
+  onInbound?: (msg: InboundMessage) => void;
+  /** Serves /mcp/tools for OpenMausBot when provided. */
+  tools?: Omit<ToolsMcpDeps, "store" | "log"> | undefined;
 }
 
 /** Builds the HTTP app from injected dependencies so tests can run it without a network. */
@@ -33,7 +36,7 @@ export function createApp(deps: AppDeps) {
       lines: deps.dialLines,
       onEmergency: deps.escalate,
       onUnknownGroup: deps.onUnknownGroup ?? (() => {}),
-      onFamilyGroupMessage: deps.onFamilyGroupMessage ?? (() => {}),
+      onInbound: deps.onInbound ?? (() => {}),
     }),
   );
   app.route(
@@ -44,6 +47,10 @@ export function createApp(deps: AppDeps) {
       onEscalate: deps.escalate,
     }),
   );
+
+  if (deps.tools) {
+    app.route("/mcp/tools", toolsMcpRoutes({ ...deps.tools, store: deps.store, log: deps.log }));
+  }
 
   app.onError((err, c) => {
     // Protocol errors (e.g. from the MCP transport) carry their own status; pass them through.
