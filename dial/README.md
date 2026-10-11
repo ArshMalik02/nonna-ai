@@ -1,17 +1,12 @@
 # Dial setup
 
-Nonna uses two Dial numbers (`dial number list`):
+Nonna currently uses **one iMessage number** (`nonna-family`) for both the elder and the family,
+set as both `DIAL_ELDER_NUMBER` and `DIAL_FAMILY_NUMBER`. iMessage avoids SMS 10DLC registration;
+the elder needs an iPhone. Its voice agent runs [`inbound-instruction.md`](inbound-instruction.md),
+which handles the elder (with the Context MCP tools) and family callers (message-taking).
 
-| Nickname | Role | Capabilities | Env var |
-| --- | --- | --- | --- |
-| `nonna-elder` | Elder line | SMS + voice | `DIAL_ELDER_NUMBER` |
-| `nonna-family` | Family line | iMessage + voice | `DIAL_FAMILY_NUMBER` |
-
-- **Elder line** answers the elder's calls with [`inbound-instruction.md`](inbound-instruction.md)
-  and texts them by SMS. Keep it free: no outbound task calls from this number.
-- **Family line** shows up as "Nonna" in Messages. A family member creates the iMessage group
-  (elder's family + this number); Dial cannot create or join groups itself, so the gateway polls
-  `GET /api/v1/groups` to find it. Outbound calls in [`outbound/`](outbound/) are placed from here.
+The SMS-only numbers on the account (`nonna-elder`, and any others) are unused. An elder without
+an iPhone would need one of them as `DIAL_ELDER_NUMBER`, plus 10DLC registration.
 
 Nicknames work anywhere Dial takes `fromNumber`, e.g. `dial message --from nonna-family ...`.
 
@@ -33,7 +28,6 @@ the elder, and posts a welcome; a family member replies OK to confirm.
 
 ## Still to do
 
-- 10DLC registration for the elder line: US carriers may filter SMS from unregistered numbers.
 - Register the real elder: `pnpm elder:set --name "<name>" --phone <their own phone>` (the seed
   uses a fake person). Their own phone, not Nonna's elder line, is what Dial reports as `from`.
 

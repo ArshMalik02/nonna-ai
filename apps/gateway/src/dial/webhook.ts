@@ -1,4 +1,4 @@
-import { DialEventEnvelope, DialMessageReceived } from "@nonna/shared";
+import { DialEventEnvelope, DialMessageReceived, type Elder } from "@nonna/shared";
 import { Hono } from "hono";
 import type { Logger } from "../logger.js";
 import { detectEmergency } from "../safety/rules.js";
@@ -82,33 +82,38 @@ export function dialWebhookRoutes(deps: WebhookDeps) {
       const { from, body } = msg.data;
       const route = routeInbound(msg.data, deps.lines);
 
-      // Elder line: the sender is the elder. Family line: the sender is a circle member, or the
-      // message came through the family group.
-      const elder =
-        route.line === "elder"
-          ? await deps.store.findElderByPhone(from)
-          : route.line === "family" && route.kind === "group"
-            ? await deps.store
-                .getFamilyGroup(route.groupId)
-                .then((g) => (g ? deps.store.getElder(g.elderId) : undefined))
-            : route.line === "family"
-              ? await deps.store.findElderByFamilyHandle(from)
-              : undefined;
-      if (!elder && route.line === "family" && route.kind === "group") {
-        deps.onUnknownGroup(route.groupId);
-        return c.json({ ok: true });
+      // Group messages belong to the group's elder. Direct messages are told apart by sender:
+      // the elder's own phone, or a family member's phone / Apple ID.
+      let elder: Elder | undefined;
+      let source: InboundMessage["source"] = "family_direct";
+      let groupId: string | undefined;
+      if (route.kind === "group") {
+        groupId = route.groupId;
+        source = "family_group";
+        const group = await deps.store.getFamilyGroup(route.groupId);
+        elder = group ? await deps.store.getElder(group.elderId) : undefined;
+        if (!elder) {
+          deps.onUnknownGroup(route.groupId);
+          return c.json({ ok: true });
+        }
+      } else if (route.kind === "direct") {
+        elder = await deps.store.findElderByPhone(from);
+        if (elder) source = "elder";
+        else elder = await deps.store.findElderByFamilyHandle(from);
       }
       if (!elder) {
-        deps.log.warn("message from unknown sender", { eventId, line: route.line });
+        deps.log.warn("message from unknown sender", { eventId, kind: route.kind });
         return c.json({ ok: true });
       }
-      const groupId = route.line === "family" && route.kind === "group" ? route.groupId : undefined;
 
-      const source = route.line === "elder" ? "elder" : groupId ? "family_group" : "family_direct";
       const safety = detectEmergency(body);
       if (safety.emergency) {
         await deps.store.audit({ actor: "safety", action: "emergency_detected", detail: eventId });
-        deps.onEmergency({ elderId: elder.id, groupId, trigger: `${route.line} message` });
+        deps.onEmergency({
+          elderId: elder.id,
+          groupId,
+          trigger: `${source === "elder" ? "elder" : "family"} message`,
+        });
       }
       // Safety ran first and never waits on this; the team only hears about it afterwards.
       deps.onInbound({

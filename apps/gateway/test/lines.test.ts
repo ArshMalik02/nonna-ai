@@ -15,26 +15,21 @@ const msg = (over: Partial<DialMessageReceived>): DialMessageReceived => ({
 });
 
 describe("routeInbound", () => {
-  it("routes group messages to the family line", () => {
+  it("routes group messages by group", () => {
     expect(routeInbound(msg({ groupId: "grp_1" }), lines)).toEqual({
-      line: "family",
       kind: "group",
       groupId: "grp_1",
     });
   });
-  it("routes SMS to the elder number to the elder line", () => {
-    expect(routeInbound(msg({ to: lines.elder, channel: "sms" }), lines)).toEqual({
-      line: "elder",
-      kind: "direct",
-    });
+  it("treats a message to either of Nonna's numbers as direct", () => {
+    expect(routeInbound(msg({ to: lines.elder }), lines)).toEqual({ kind: "direct" });
+    expect(routeInbound(msg({ to: lines.family }), lines)).toEqual({ kind: "direct" });
   });
-  it("routes direct iMessages to the family number to the family line", () => {
-    expect(routeInbound(msg({ to: lines.family }), lines)).toEqual({
-      line: "family",
-      kind: "direct",
-    });
+  it("works when the elder and family share one number", () => {
+    const shared = { elder: "+14155550101", family: "+14155550101" };
+    expect(routeInbound(msg({ to: shared.elder }), shared)).toEqual({ kind: "direct" });
   });
   it("flags messages to any other number", () => {
-    expect(routeInbound(msg({ to: "+10000000000" }), lines)).toEqual({ line: "unknown" });
+    expect(routeInbound(msg({ to: "+10000000000" }), lines)).toEqual({ kind: "other" });
   });
 });

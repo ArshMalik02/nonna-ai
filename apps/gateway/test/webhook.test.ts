@@ -114,9 +114,27 @@ describe("POST /webhooks/dial", () => {
     );
   });
 
-  it("does not treat a family member texting the elder line as the elder", async () => {
-    await post(event("evt_7", "I fell", "+14155550124", { to: dialLines.elder }));
-    expect(escalate).not.toHaveBeenCalled();
+  it("tells the elder and family apart by sender, even on one shared number", async () => {
+    const onInbound = vi.fn();
+    app = createApp({
+      store,
+      log: createLogger("error"),
+      dialWebhookSecret: secret,
+      dialLines: { elder: dialLines.family, family: dialLines.family },
+      contextMcpToken,
+      escalate,
+      onInbound,
+    });
+    await post(
+      event("evt_7a", "Can you refill my pills?", "+14155550123", { to: dialLines.family }),
+    );
+    await post(
+      event("evt_7b", "Can you call Dad's clinic?", "+14155550124", { to: dialLines.family }),
+    );
+    expect(onInbound.mock.calls.map((c) => (c[0] as { source: string }).source)).toEqual([
+      "elder",
+      "family_direct",
+    ]);
   });
 
   it("passes family group messages on to the team", async () => {

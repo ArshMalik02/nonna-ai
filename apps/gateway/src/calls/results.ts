@@ -51,19 +51,31 @@ export async function describeCall(
 ): Promise<{ elderId: string; text: string } | undefined> {
   const { store, lines } = deps;
 
-  if (call.direction === "inbound" && call.to === lines.elder) {
+  // Inbound calls are told apart by caller (one number may serve the elder and the family).
+  if (call.direction === "inbound" && (call.to === lines.elder || call.to === lines.family)) {
     const elder = await store.findElderByPhone(call.from);
-    if (!elder) return undefined;
-    const tasks = await store.listTasksCreatedSince(elder.id, new Date(call.createdAt));
+    if (elder) {
+      const tasks = await store.listTasksCreatedSince(elder.id, new Date(call.createdAt));
+      return {
+        elderId: elder.id,
+        text: [
+          `The elder called Nonna (${minutes(call.duration)}).`,
+          tasks.length
+            ? `Tasks created during the call:\n${tasks.map(taskLine).join("\n")}`
+            : "No tasks were created during the call.",
+          `Transcript:\n${formatTranscript(call, { agent: "Nonna", user: "Elder" })}`,
+          "Post a short, warm summary of the call for the family, then start on any tasks.",
+        ].join("\n\n"),
+      };
+    }
+    const family = await store.findElderByFamilyHandle(call.from);
+    if (!family) return undefined;
     return {
-      elderId: elder.id,
+      elderId: family.id,
       text: [
-        `The elder called Nonna (${minutes(call.duration)}).`,
-        tasks.length
-          ? `Tasks created during the call:\n${tasks.map(taskLine).join("\n")}`
-          : "No tasks were created during the call.",
-        `Transcript:\n${formatTranscript(call, { agent: "Nonna", user: "Elder" })}`,
-        "Post a short, warm summary of the call for the family, then start on any tasks.",
+        `A family member (${call.from}) called Nonna (${minutes(call.duration)}).`,
+        `Transcript:\n${formatTranscript(call, { agent: "Nonna", user: "Caller" })}`,
+        "Act on anything they asked for and confirm in the family group.",
       ].join("\n\n"),
     };
   }
@@ -89,19 +101,6 @@ export async function describeCall(
         `Emergency alert call to family member ${call.to} ended: ${call.status}.`,
         `Transcript:\n${formatTranscript(call, { agent: "Nonna", user: "Family member" })}`,
         "If nobody has confirmed they are with the elder, say so clearly in the family group.",
-      ].join("\n\n"),
-    };
-  }
-
-  if (call.direction === "inbound" && call.to === lines.family) {
-    const elder = await store.findElderByFamilyHandle(call.from);
-    if (!elder) return undefined;
-    return {
-      elderId: elder.id,
-      text: [
-        `A family member (${call.from}) called Nonna's family line (${minutes(call.duration)}).`,
-        `Transcript:\n${formatTranscript(call, { agent: "Nonna", user: "Caller" })}`,
-        "Act on anything they asked for and confirm in the family group.",
       ].join("\n\n"),
     };
   }

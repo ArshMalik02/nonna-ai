@@ -9,12 +9,19 @@ loop over iMessage, and escalates to real people when something is wrong.
 - **[OpenMausBot](https://github.com/milind-soni/OpenMausBot)** runs the agent team, unmodified.
 - **This repo** is the glue: the gateway, the safety rules, the task engine and the team definition.
 
-### Two numbers, two audiences
+### One iMessage number for everyone
 
-| Line | Dial capabilities | Who uses it |
-| --- | --- | --- |
-| **Elder line** | SMS + voice | The elder: the one number they text and call. Nonna never places task calls from it, so it is always free for them. |
-| **Family line** | iMessage + voice | The family iMessage group (a family member creates the group and adds this number), direct iMessages from family, and Nonna's outbound task calls (clinic, cab company, family alerts). |
+Nonna uses one iMessage-capable Dial number (`DIAL_ELDER_NUMBER` = `DIAL_FAMILY_NUMBER`):
+
+- **The elder** iMessages and calls it 1:1 (they need an iPhone). iMessage needs no SMS 10DLC
+  registration.
+- **The family** has it in their iMessage group (a family member creates the group and adds it)
+  and can iMessage it directly.
+- **Outbound** task and alert calls are placed from it.
+
+The gateway tells the elder and family apart by **sender** (the elder's own phone vs. a family
+member's phone or Apple ID), so the two env vars can also point at separate numbers, e.g. an SMS
+line for an elder without an iPhone (that line then needs 10DLC registration).
 
 Read [`docs/architecture.md`](docs/architecture.md) and [`docs/build-plan.md`](docs/build-plan.md) first.
 
