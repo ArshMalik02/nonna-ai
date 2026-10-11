@@ -1,0 +1,26 @@
+# Local stack. OpenMausBot runs unmodified next to the gateway (see docs/build-plan.md §4).
+services:
+  gateway:
+    build:
+      context: .
+      dockerfile: apps/gateway/Dockerfile
+    env_file: .env
+    environment:
+      DATABASE_URL: file:/data/nonna.db
+      OMB_API_URL: http://omb:8799
+    ports:
+      - "8787:8787"
+    volumes:
+      - gateway-data:/data
+
+  # Uncomment once the OMB image/tag is chosen (npx openmausbot serve, or its Docker image).
+  # omb:
+  #   image: openmausbot:latest
+  #   ports:
+  #     - "8799:8799"
+  #   volumes:
+  #     - omb-data:/root/.openmausbot
+
+volumes:
+  gateway-data:
+  # omb-data:
