@@ -3,11 +3,14 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { type Elder, TaskKind } from "@nonna/shared";
 import { Hono } from "hono";
 import { z } from "zod";
+import type { OmbRelay } from "../omb/relay.js";
 import type { Store } from "../store.js";
 
 export interface ContextMcpDeps {
   store: Store;
   onEscalate: (args: { elderId: string; trigger: string }) => void;
+  /** Posts new tasks to the family's OMB channel (fire-and-forget, never slows the call). */
+  relay?: OmbRelay | undefined;
 }
 
 const text = (t: string) => ({ content: [{ type: "text" as const, text: t }] });
@@ -44,6 +47,7 @@ function buildServer(elder: Elder, deps: ContextMcpDeps) {
     async ({ kind, summary }) => {
       const task = await deps.store.createTask({ elderId: elder.id, kind, summary });
       await deps.store.audit({ actor: "voice", action: "create_task", taskId: task.id });
+      deps.relay?.announceTask(task);
       return text(
         `Task ${task.id} created. Tell the caller you will set it up and text their family.`,
       );

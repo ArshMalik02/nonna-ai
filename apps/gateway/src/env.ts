@@ -20,6 +20,11 @@ const Env = z.object({
 
   OMB_API_URL: z.url().default("http://localhost:8799"),
   OMB_API_TOKEN: z.string().optional(),
+  /** Bearer token OMB sends to /mcp/tools. Leave unset to keep the tools endpoint off. */
+  NONNA_TOOLS_TOKEN: z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.string().min(24, "use at least 24 characters (openssl rand -hex 24)").optional(),
+  ),
 });
 export type Env = z.infer<typeof Env>;
 

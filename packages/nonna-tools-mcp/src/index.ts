@@ -1,9 +1,10 @@
-import { TaskKind, TaskStatus } from "@nonna/shared";
+import { Phone, TaskKind, TaskStatus } from "@nonna/shared";
 import { z } from "zod";
 
 /**
  * Tool contract for the Nonna team bots (docs/build-plan.md §5.1).
- * The gateway implements these; omb/nonna-team.md grants them per bot.
+ * The gateway implements these (apps/gateway/src/tools/nonna-tools.ts, served at /mcp/tools);
+ * omb/nonna-team.md grants them per bot.
  */
 export const nonnaTools = {
   get_elder_profile: {
@@ -42,7 +43,7 @@ export const nonnaTools = {
     description: "Place an AI phone call from the worker line to a business to get a task done.",
     input: z.object({
       taskId: z.string(),
-      to: z.string(),
+      to: Phone,
       goal: z.string().max(1000),
     }),
   },

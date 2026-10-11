@@ -1,6 +1,7 @@
 import { DialEventEnvelope, DialMessageReceived } from "@nonna/shared";
 import { Hono } from "hono";
 import type { Logger } from "../logger.js";
+import type { OmbRelay } from "../omb/relay.js";
 import { detectEmergency } from "../safety/rules.js";
 import type { Store } from "../store.js";
 import { verifyDialSignature } from "./signature.js";
@@ -11,6 +12,8 @@ export interface WebhookDeps {
   secret: string;
   /** Fired (not awaited) for emergencies so the webhook still acks within Dial's timeout. */
   onEmergency: (args: { elderId: string; groupId?: string | undefined; trigger: string }) => void;
+  /** Hands non-emergency messages to the family's OMB channel. Optional so tests can omit it. */
+  relay?: OmbRelay | undefined;
   now?: () => number;
 }
 
@@ -65,7 +68,7 @@ export function dialWebhookRoutes(deps: WebhookDeps) {
         return c.json({ ok: true, escalated: true });
       }
 
-      // TODO(phase 1): hand off to the OMB family channel / task engine.
+      deps.relay?.forwardMessage({ elderId: elder.id, from, body });
     }
 
     return c.json({ ok: true });

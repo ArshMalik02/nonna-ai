@@ -20,6 +20,7 @@
     "@libsql/client": "^0.18.0",
     "@modelcontextprotocol/sdk": "^1.32.1",
     "@nonna/shared": "workspace:*",
+    "@nonna/tools-mcp": "workspace:*",
     "drizzle-orm": "^0.45.4",
     "hono": "^4.13.13",
     "zod": "^4.6.6"
