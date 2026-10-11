@@ -6,6 +6,9 @@ Endpoints
   POST /act                    start Act threads with agents from a Search (admin approval required)
   POST /act/continue           typed follow-up on a thread (admin approval required)
   GET  /act/{act_request_id}   thread state + plain-language digest
+  POST /ride/quote             read-only price quote from a ride provider (direct MCP route)
+  POST /ride/propose           quote + availability -> plain-language proposal for the admin
+  POST /ride/book              REAL booking; needs admin approval + RIDE_LIVE_BOOKING=true
 
 Rules enforced here (from the product + Darwin docs):
   * Search is discovery only; it contacts no provider.
@@ -18,12 +21,14 @@ from __future__ import annotations
 
 import dataclasses
 import os
+import threading
 from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 
 import darwin_client as dc
+from ride_agent import Proposal, RideAgent
 
 app = FastAPI(title="Nonna Darwin layer", version="0.1")
 
@@ -188,3 +193,101 @@ def act_status(act_request_id: str, include_thread_state: bool = True) -> dict:
     except Exception as e:  # noqa: BLE001
         raise _map_error(e) from e
     return {"receipt": receipt, "digest": _digest(receipt)}
+
+
+# ----------------------------- ride (direct MCP route) -------------------
+# Darwin's ride agents have no executable route yet, so rides go straight to a
+# provider endpoint resolved from the official MCP registry (see ride_agent.py).
+_ride: RideAgent | None = None
+_ride_lock = threading.Lock()
+_proposals: dict[str, Proposal] = {}  # proposal_id -> Proposal (in memory)
+
+
+def _ride_agent() -> RideAgent:
+    global _ride
+    with _ride_lock:
+        if _ride is None:
+            _ride = RideAgent()
+        return _ride
+
+
+class RideQuoteIn(BaseModel):
+    pickup: str = Field(min_length=2, max_length=200)
+    destination: str = Field(min_length=2, max_length=200)
+    passengers: int = Field(default=1, ge=1, le=5)
+
+
+class Rider(BaseModel):
+    first_name: str = Field(min_length=1, max_length=60)
+    last_name: str = Field(min_length=1, max_length=60)
+    phone: str = Field(pattern=r"^\+[1-9][0-9 ()/-]{6,22}$", description="international format")
+
+
+class RideProposeIn(RideQuoteIn):
+    date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$", description="YYYY-MM-DD, provider local time")
+    time: str = Field(pattern=r"^([01]?\d|2[0-3]):[0-5]\d$", description="HH:MM 24h")
+    rider: Rider
+
+
+class RideBookIn(BaseModel):
+    proposal_id: str
+    approval: Approval
+    customer_confirmed: bool
+    accepted_terms: bool
+
+
+def _ride_error(e: Exception) -> HTTPException:
+    if isinstance(e, PermissionError):
+        return HTTPException(403, str(e))
+    return HTTPException(502, f"ride provider error: {str(e)[:300]}")
+
+
+@app.post("/ride/quote", dependencies=[Depends(require_token)])
+def ride_quote(body: RideQuoteIn) -> dict:
+    try:
+        q = _ride_agent().quote(body.pickup, body.destination, body.passengers)
+    except Exception as e:  # noqa: BLE001
+        raise _ride_error(e) from e
+    out = dataclasses.asdict(q)
+    out.pop("raw", None)
+    return {"provider": "RIED.TAXI", "quote": out}
+
+
+@app.post("/ride/propose", dependencies=[Depends(require_token)])
+def ride_propose(body: RideProposeIn) -> dict:
+    """Read-only: quote + availability. Sends no personal data to the provider."""
+    try:
+        agent = _ride_agent()
+        q = agent.quote(body.pickup, body.destination, body.passengers)
+        if not q.ok:
+            raise HTTPException(422, "Provider could not quote this trip")
+        p = agent.prepare_booking(q, body.date, body.time, body.passengers,
+                                  body.rider.first_name, body.rider.last_name, body.rider.phone)
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001
+        raise _ride_error(e) from e
+    _proposals[p.idempotency_key] = p
+    return {
+        "proposalId": p.idempotency_key,
+        "available": p.available,
+        "priceEur": q.price_eur,
+        "quoteValidUntil": q.valid_until,
+        "summaryForAdmin": p.plain_language(),
+        "shares": ["rider first and last name", "rider phone number"],
+        "booked": False,
+    }
+
+
+@app.post("/ride/book", dependencies=[Depends(require_token)])
+def ride_book(body: RideBookIn) -> dict:
+    _need_approval(body.approval)
+    p = _proposals.get(body.proposal_id)
+    if p is None:
+        raise HTTPException(404, "Unknown or expired proposal_id; call /ride/propose again")
+    try:
+        result = _ride_agent().book(p, admin_approved=True, customer_confirmed=body.customer_confirmed,
+                                    accepted_terms=body.accepted_terms)
+    except Exception as e:  # noqa: BLE001
+        raise _ride_error(e) from e
+    return {"booked": True, "providerResponse": result, "approvedBy": body.approval.approved_by}

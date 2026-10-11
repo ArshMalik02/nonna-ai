@@ -1,6 +1,6 @@
 {
-  "searchId": "srch_44d17fa1-f47f-4130-87b5-0ed04e274865",
-  "responseId": "sresp_649b13e9-c83f-4c3e-b712-6fe2cfdcee7d",
+  "searchId": "srch_c334272e-61e0-489a-ac70-ad03023b9357",
+  "responseId": "sresp_a0a5b1ca-136a-42a0-a8ae-0e2502dbee1b",
   "previousResponseId": null,
   "contractVersion": "search-v3.0",
   "status": "needs_input",
@@ -24,7 +24,7 @@
         "canStartThread": false,
         "canAttemptThread": false,
         "reasons": [
-          "This capability allows booking a taxi through Taxis Fabbrimone."
+          "This tool can create a real taxi booking request with Taxis Fabbrimone."
         ],
         "uncertainties": [
           "Execution requires a fresh readiness check."
@@ -51,7 +51,7 @@
         "canStartThread": false,
         "canAttemptThread": false,
         "reasons": [
-          "This capability allows booking a Rovv ride, which is a type of taxi service."
+          "This tool can book a Rovv ride, which is a type of taxi service."
         ],
         "uncertainties": [
           "Execution requires a fresh readiness check."
@@ -63,12 +63,12 @@
     ],
     "assessment": {
       "outcome": "clarify",
-      "explanation": "I found two services that can book a taxi for you: Taxis Fabbrimone and Rovv. Taxis Fabbrimone requires at least 12 hours notice for a booking. Rovv requires pickup/dropoff coordinates, a vehicle type ID, and a payment method."
+      "explanation": "I found two services that can book a taxi ride: Taxis Fabbrimone and Rovv. Taxis Fabbrimone requires a booking lead time of at least 12 hours. Rovv requires pickup/dropoff coordinates, a vehicle type ID, and a payment method."
     },
     "relatedSearches": [],
     "plan": null,
     "question": "Which taxi service would you like to use, and what are your pickup and drop-off locations?",
     "noMatchReason": null,
-    "overview": "I found two services that can book a taxi for you: Taxis Fabbrimone and Rovv. Taxis Fabbrimone requires at least 12 hours notice for a booking. Rovv requires pickup/dropoff coordinates, a vehicle type ID, and a payment method."
+    "overview": "I found two services that can book a taxi ride: Taxis Fabbrimone and Rovv. Taxis Fabbrimone requires a booking lead time of at least 12 hours. Rovv requires pickup/dropoff coordinates, a vehicle type ID, and a payment method."
   }
 }

@@ -72,3 +72,40 @@ def test_darwin_403_is_passed_through(monkeypatch):
 def test_api_token_enforced(monkeypatch):
     monkeypatch.setenv("NONNA_API_TOKEN", "s3cret")
     assert client.post("/search", json={"query": "x"}).status_code == 401
+
+
+# ---- ride endpoints (provider mocked) ----
+from ride_agent import Proposal, Quote  # noqa: E402
+
+
+class FakeRide:
+    def quote(self, *a, **k):
+        return Quote(ok=True, price_eur=160.0, quote_id="Q1", valid_until="2099-01-01", pickup="A", destination="B", vehicle="Car")
+
+    def prepare_booking(self, q, date, time, pax, f, l, phone):
+        return Proposal(q, date, time, pax, f, l, phone, "nonna-123", True)
+
+    def book(self, p, **k):
+        import ride_agent
+        return ride_agent.RideAgent.book(self, p, **k)
+
+
+RIDE_BODY = {"pickup": "Hauptplatz Ried", "destination": "Salzburg Airport", "passengers": 1, "date": "2026-10-15",
+             "time": "14:00", "rider": {"first_name": "Test", "last_name": "Rider", "phone": "+43 660 0000000"}}
+
+
+def test_ride_propose_then_book_is_gated(monkeypatch):
+    monkeypatch.setattr(api, "_ride", FakeRide())
+    prop = client.post("/ride/propose", json=RIDE_BODY).json()
+    assert prop["booked"] is False and prop["priceEur"] == 160.0
+    book = {"proposal_id": prop["proposalId"], "approval": APPROVAL, "customer_confirmed": True, "accepted_terms": True}
+    monkeypatch.delenv("RIDE_LIVE_BOOKING", raising=False)
+    r = client.post("/ride/book", json=book)
+    assert r.status_code == 403 and "disabled" in r.text
+    r = client.post("/ride/book", json={**book, "approval": {**APPROVAL, "admin_approved": False}})
+    assert r.status_code == 403
+
+
+def test_ride_book_unknown_proposal():
+    r = client.post("/ride/book", json={"proposal_id": "nope", "approval": APPROVAL, "customer_confirmed": True, "accepted_terms": True})
+    assert r.status_code == 404
