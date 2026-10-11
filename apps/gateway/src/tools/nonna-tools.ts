@@ -57,69 +57,100 @@ function buildServer(deps: NonnaToolsDeps) {
   const now = () => deps.now?.() ?? new Date();
   const server = new McpServer({ name: "nonna-tools", version: "0.1.0" });
 
-  server.registerTool("get_elder_profile", { description: nonnaTools.get_elder_profile.description, inputSchema: nonnaTools.get_elder_profile.input.shape }, async ({ elderId }) => {
-    const elder = await store.getElder(elderId);
-    if (!elder) return fail(`Unknown elder ${elderId}.`);
-    const circle = await store.listCircle(elderId);
-    // Phone numbers stay in the gateway; bots address people through the tools.
-    return ok({
-      id: elder.id,
-      name: elder.name,
-      timezone: elder.timezone,
-      language: elder.language,
-      address: elder.address ?? null,
-      preferences: elder.preferences ?? null,
-      careNotes: elder.careNotes ?? null,
-      circle: circle.map((m) => ({
-        id: m.id,
-        name: m.name,
-        relation: m.relation,
-        canApprove: m.canApprove,
-        canPay: m.canPay,
-        isNearby: m.isNearby,
-      })),
-    });
-  });
+  server.registerTool(
+    "get_elder_profile",
+    {
+      description: nonnaTools.get_elder_profile.description,
+      inputSchema: nonnaTools.get_elder_profile.input.shape,
+    },
+    async ({ elderId }) => {
+      const elder = await store.getElder(elderId);
+      if (!elder) return fail(`Unknown elder ${elderId}.`);
+      const circle = await store.listCircle(elderId);
+      // Phone numbers stay in the gateway; bots address people through the tools.
+      return ok({
+        id: elder.id,
+        name: elder.name,
+        timezone: elder.timezone,
+        language: elder.language,
+        address: elder.address ?? null,
+        preferences: elder.preferences ?? null,
+        careNotes: elder.careNotes ?? null,
+        circle: circle.map((m) => ({
+          id: m.id,
+          name: m.name,
+          relation: m.relation,
+          canApprove: m.canApprove,
+          canPay: m.canPay,
+          isNearby: m.isNearby,
+        })),
+      });
+    },
+  );
 
-  server.registerTool("update_task", { description: nonnaTools.update_task.description, inputSchema: nonnaTools.update_task.input.shape }, async ({ taskId, status }) => {
-    const task = await store.getTask(taskId);
-    if (!task) return fail(`Unknown task ${taskId}.`);
-    if (!canTransition(task.status, status)) {
-      return fail(`Task ${taskId} cannot move from ${task.status} to ${status}.`);
-    }
-    await store.setTaskStatus(taskId, status);
-    // The note can hold health details, so only the transition is audited.
-    await store.audit({
-      actor: "omb",
-      action: "update_task",
-      taskId,
-      detail: `${task.status}->${status}`,
-    });
-    if (status === "escalated") {
-      deps.onEscalate({ elderId: task.elderId, trigger: "agent flagged a task" });
-    }
-    return ok(`Task ${taskId} is now ${status}.`);
-  });
+  server.registerTool(
+    "update_task",
+    {
+      description: nonnaTools.update_task.description,
+      inputSchema: nonnaTools.update_task.input.shape,
+    },
+    async ({ taskId, status }) => {
+      const task = await store.getTask(taskId);
+      if (!task) return fail(`Unknown task ${taskId}.`);
+      if (!canTransition(task.status, status)) {
+        return fail(`Task ${taskId} cannot move from ${task.status} to ${status}.`);
+      }
+      await store.setTaskStatus(taskId, status);
+      // The note can hold health details, so only the transition is audited.
+      await store.audit({
+        actor: "omb",
+        action: "update_task",
+        taskId,
+        detail: `${task.status}->${status}`,
+      });
+      if (status === "escalated") {
+        deps.onEscalate({ elderId: task.elderId, trigger: "agent flagged a task" });
+      }
+      return ok(`Task ${taskId} is now ${status}.`);
+    },
+  );
 
-  server.registerTool("message_family", { description: nonnaTools.message_family.description, inputSchema: nonnaTools.message_family.input.shape }, async ({ elderId, body }) => {
-    const group = await store.getFamilyGroup(elderId);
-    if (!group) return fail(`Elder ${elderId} has no family group yet. Nothing was sent.`);
-    await dial.sendMessage({ groupId: group.dialGroupId, body });
-    await store.audit({ actor: "omb", action: "message_family" });
-    return ok("Sent to the family group.");
-  });
+  server.registerTool(
+    "message_family",
+    {
+      description: nonnaTools.message_family.description,
+      inputSchema: nonnaTools.message_family.input.shape,
+    },
+    async ({ elderId, body }) => {
+      const group = await store.getFamilyGroup(elderId);
+      if (!group) return fail(`Elder ${elderId} has no family group yet. Nothing was sent.`);
+      await dial.sendMessage({ groupId: group.dialGroupId, body });
+      await store.audit({ actor: "omb", action: "message_family" });
+      return ok("Sent to the family group.");
+    },
+  );
 
-  server.registerTool("message_elder", { description: nonnaTools.message_elder.description, inputSchema: nonnaTools.message_elder.input.shape }, async ({ elderId, body }) => {
-    const elder = await store.getElder(elderId);
-    if (!elder) return fail(`Unknown elder ${elderId}.`);
-    await dial.sendMessage({ to: elder.phone, body });
-    await store.audit({ actor: "omb", action: "message_elder" });
-    return ok(`Sent to ${elder.name}.`);
-  });
+  server.registerTool(
+    "message_elder",
+    {
+      description: nonnaTools.message_elder.description,
+      inputSchema: nonnaTools.message_elder.input.shape,
+    },
+    async ({ elderId, body }) => {
+      const elder = await store.getElder(elderId);
+      if (!elder) return fail(`Unknown elder ${elderId}.`);
+      await dial.sendMessage({ to: elder.phone, body });
+      await store.audit({ actor: "omb", action: "message_elder" });
+      return ok(`Sent to ${elder.name}.`);
+    },
+  );
 
   server.registerTool(
     "request_family_approval",
-    { description: nonnaTools.request_family_approval.description, inputSchema: nonnaTools.request_family_approval.input.shape },
+    {
+      description: nonnaTools.request_family_approval.description,
+      inputSchema: nonnaTools.request_family_approval.input.shape,
+    },
     async ({ taskId, question }) => {
       const task = await store.getTask(taskId);
       if (!task) return fail(`Unknown task ${taskId}.`);
@@ -151,7 +182,10 @@ function buildServer(deps: NonnaToolsDeps) {
 
   server.registerTool(
     "schedule_reminder",
-    { description: nonnaTools.schedule_reminder.description, inputSchema: nonnaTools.schedule_reminder.input.shape },
+    {
+      description: nonnaTools.schedule_reminder.description,
+      inputSchema: nonnaTools.schedule_reminder.input.shape,
+    },
     async ({ taskId, fireAt, text }) => {
       const task = await store.getTask(taskId);
       if (!task) return fail(`Unknown task ${taskId}.`);
@@ -160,58 +194,79 @@ function buildServer(deps: NonnaToolsDeps) {
       if (ahead <= 0) return fail("fireAt must be in the future.");
       if (ahead > MAX_REMINDER_AHEAD_MS) return fail("fireAt must be within 30 days.");
 
-      const reminder = await store.createReminder({ taskId, fireAt: at, channel: "imessage", text });
+      const reminder = await store.createReminder({
+        taskId,
+        fireAt: at,
+        channel: "imessage",
+        text,
+      });
       await store.audit({ actor: "omb", action: "schedule_reminder", taskId });
       return ok({ reminderId: reminder.id, fireAt: reminder.fireAt, channel: reminder.channel });
     },
   );
 
-  server.registerTool("darwin_search", { description: nonnaTools.darwin_search.description, inputSchema: nonnaTools.darwin_search.input.shape }, async ({ taskId, kind, query }) => {
-    const task = await store.getTask(taskId);
-    if (!task) return fail(`Unknown task ${taskId}.`);
-    const elder = await store.getElder(task.elderId);
-    const result = await darwin.search({
-      query,
-      maxResults: 5,
-      context: [
-        { type: "text", value: `Task kind: ${kind}` },
-        ...(elder?.address ? [{ type: "text" as const, value: `Location: ${elder.address}` }] : []),
-      ],
-    });
-    await store.audit({ actor: "omb", action: "darwin_search", taskId });
-    const json = JSON.stringify(result);
-    return ok(
-      json.length > MAX_TOOL_RESULT_CHARS ? `${json.slice(0, MAX_TOOL_RESULT_CHARS)}…` : json,
-    );
-  });
+  server.registerTool(
+    "darwin_search",
+    {
+      description: nonnaTools.darwin_search.description,
+      inputSchema: nonnaTools.darwin_search.input.shape,
+    },
+    async ({ taskId, kind, query }) => {
+      const task = await store.getTask(taskId);
+      if (!task) return fail(`Unknown task ${taskId}.`);
+      const elder = await store.getElder(task.elderId);
+      const result = await darwin.search({
+        query,
+        maxResults: 5,
+        context: [
+          { type: "text", value: `Task kind: ${kind}` },
+          ...(elder?.address
+            ? [{ type: "text" as const, value: `Location: ${elder.address}` }]
+            : []),
+        ],
+      });
+      await store.audit({ actor: "omb", action: "darwin_search", taskId });
+      const json = JSON.stringify(result);
+      return ok(
+        json.length > MAX_TOOL_RESULT_CHARS ? `${json.slice(0, MAX_TOOL_RESULT_CHARS)}…` : json,
+      );
+    },
+  );
 
-  server.registerTool("dial_call_business", { description: nonnaTools.dial_call_business.description, inputSchema: nonnaTools.dial_call_business.input.shape }, async (input) => {
-    const { taskId, to, goal } = input;
-    const task = await store.getTask(taskId);
-    if (!task) return fail(`Unknown task ${taskId}.`);
-    const elder = await store.getElder(task.elderId);
-    if (!elder) return fail(`Unknown elder for task ${taskId}.`);
+  server.registerTool(
+    "dial_call_business",
+    {
+      description: nonnaTools.dial_call_business.description,
+      inputSchema: nonnaTools.dial_call_business.input.shape,
+    },
+    async (input) => {
+      const { taskId, to, goal } = input;
+      const task = await store.getTask(taskId);
+      if (!task) return fail(`Unknown task ${taskId}.`);
+      const elder = await store.getElder(task.elderId);
+      if (!elder) return fail(`Unknown elder for task ${taskId}.`);
 
-    // Same task + number + goal always gets the same key, so a retried tool call never
-    // places a second phone call.
-    const idempotencyKey = createHash("sha256")
-      .update(`${taskId}|${to}|${goal}`)
-      .digest("hex")
-      .slice(0, 32);
-    const call = await dial.placeCall({
-      to,
-      fromNumber: deps.workerNumber,
-      outboundInstruction: `You are Nonna, an AI assistant calling on behalf of ${elder.name}. Say at the start that you are an AI assistant calling for ${elder.name}. Your goal: ${goal}. Be polite and brief. Confirm any date, time and price out loud before you end the call. Never share payment details.`,
-      maxCallDurationSeconds: 600,
-      idempotencyKey,
-    });
-    await store.audit({ actor: "omb", action: "dial_call_business", taskId });
-    log.info("task call placed", { taskId });
-    return ok({
-      call,
-      note: "The outcome arrives later with the call transcript. Do not mark the task confirmed yet.",
-    });
-  });
+      // Same task + number + goal always gets the same key, so a retried tool call never
+      // places a second phone call.
+      const idempotencyKey = createHash("sha256")
+        .update(`${taskId}|${to}|${goal}`)
+        .digest("hex")
+        .slice(0, 32);
+      const call = await dial.placeCall({
+        to,
+        fromNumber: deps.workerNumber,
+        outboundInstruction: `You are Nonna, an AI assistant calling on behalf of ${elder.name}. Say at the start that you are an AI assistant calling for ${elder.name}. Your goal: ${goal}. Be polite and brief. Confirm any date, time and price out loud before you end the call. Never share payment details.`,
+        maxCallDurationSeconds: 600,
+        idempotencyKey,
+      });
+      await store.audit({ actor: "omb", action: "dial_call_business", taskId });
+      log.info("task call placed", { taskId });
+      return ok({
+        call,
+        note: "The outcome arrives later with the call transcript. Do not mark the task confirmed yet.",
+      });
+    },
+  );
 
   return server;
 }
