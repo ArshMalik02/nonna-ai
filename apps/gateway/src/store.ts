@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { CircleMember, Elder, Task, TaskKind, TaskStatus } from "@nonna/shared";
+import type { DarwinAgent, DarwinPendingRequest } from "./darwin/types.js";
 
 export interface NewTask {
   elderId: string;
@@ -15,6 +16,34 @@ export interface NewTaskStep {
   darwinSearchId?: string | undefined;
   darwinThreadId?: string | undefined;
   result?: string | undefined;
+}
+
+export type DarwinRunStatus =
+  | "starting"
+  | "running"
+  | "needs_input"
+  | "needs_review"
+  | "unknown"
+  | "failed"
+  | "completed";
+
+export interface DarwinRun {
+  id: string;
+  taskId: string;
+  mode: "live" | "proxy";
+  searchId?: string | undefined;
+  agentId: string;
+  capabilityId: string;
+  agentName?: string | undefined;
+  idempotencyKey: string;
+  status: DarwinRunStatus;
+  actRequestId?: string | undefined;
+  threadId?: string | undefined;
+  pending: DarwinPendingRequest[];
+  outcome?: unknown;
+  seenMessages: number;
+  replies: Record<string, { text: string; status: "sending" | "sent" | "unknown" }>;
+  error?: string | undefined;
 }
 
 export interface FamilyGroup {
@@ -56,8 +85,25 @@ export interface Store {
   addTaskStep(step: NewTaskStep): Promise<void>;
   /** The task a Dial call was placed for, if any. */
   findTaskByCallId(dialCallId: string): Promise<Task | undefined>;
+  saveDarwinSearch(search: {
+    searchId: string;
+    taskId?: string | undefined;
+    mode: "live" | "proxy";
+    agents: DarwinAgent[];
+  }): Promise<void>;
+  getDarwinSearch(
+    searchId: string,
+  ): Promise<{ taskId?: string | undefined; agents: DarwinAgent[] } | undefined>;
+  createDarwinRun(run: DarwinRun): Promise<void>;
+  updateDarwinRun(id: string, patch: Partial<Omit<DarwinRun, "id" | "taskId">>): Promise<DarwinRun>;
+  /** The most recent run for a task. */
+  latestDarwinRun(taskId: string): Promise<DarwinRun | undefined>;
+  /** Runs the watcher should keep following. */
+  listActiveDarwinRuns(): Promise<DarwinRun[]>;
   audit(entry: { actor: string; action: string; taskId?: string; detail?: string }): Promise<void>;
 }
+
+const ACTIVE_RUN: ReadonlySet<DarwinRunStatus> = new Set(["running", "needs_input", "starting"]);
 
 export class MemoryStore implements Store {
   readonly events = new Set<string>();
@@ -68,6 +114,38 @@ export class MemoryStore implements Store {
   readonly taskCreatedAt = new Map<string, Date>();
   readonly steps: NewTaskStep[] = [];
   readonly auditLog: { actor: string; action: string }[] = [];
+  readonly searches = new Map<string, { taskId?: string | undefined; agents: DarwinAgent[] }>();
+  readonly runs: DarwinRun[] = [];
+
+  async saveDarwinSearch(search: {
+    searchId: string;
+    taskId?: string | undefined;
+    agents: DarwinAgent[];
+  }) {
+    this.searches.set(search.searchId, { taskId: search.taskId, agents: search.agents });
+  }
+  async getDarwinSearch(searchId: string) {
+    return this.searches.get(searchId);
+  }
+  async createDarwinRun(run: DarwinRun) {
+    if (this.runs.some((r) => r.idempotencyKey === run.idempotencyKey)) {
+      throw new Error("duplicate idempotency key");
+    }
+    this.runs.push(structuredClone(run));
+  }
+  async updateDarwinRun(id: string, patch: Partial<Omit<DarwinRun, "id" | "taskId">>) {
+    const run = this.runs.find((r) => r.id === id);
+    if (!run) throw new Error(`No run ${id}`);
+    Object.assign(run, structuredClone(patch));
+    return structuredClone(run);
+  }
+  async latestDarwinRun(taskId: string) {
+    const run = this.runs.filter((r) => r.taskId === taskId).at(-1);
+    return run ? structuredClone(run) : undefined;
+  }
+  async listActiveDarwinRuns() {
+    return this.runs.filter((r) => ACTIVE_RUN.has(r.status)).map((r) => structuredClone(r));
+  }
 
   async recordInboundEvent(event: { id: string }) {
     if (this.events.has(event.id)) return false;

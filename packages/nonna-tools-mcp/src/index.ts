@@ -40,21 +40,36 @@ export const nonnaTools = {
   },
   darwin_search: {
     description:
-      "Search Darwin for an outside agent that can do a task (ride, booking, pharmacy, payment, home help...). Returns candidates with what they need, price and lead time. Put location, time, budget and mobility needs in context.",
+      "Search Darwin for an outside agent that can do a task (ride, booking, pharmacy, payment, home help...). Pass the taskId. Put location, time, budget and mobility needs in context. Returns searchId and response.agents with what each needs, price and lead time.",
     input: z.object({
+      taskId: z.string().optional(),
       query: z.string().min(3).max(500),
       context: z.string().max(1000).optional(),
     }),
   },
   darwin_act: {
     description:
-      "Ask a Darwin agent from darwin_search to do the task. Only after a family member who can approve said YES. Include every required input in the request. A result marked simulated is a demo: tell the family it was a test booking.",
+      "Start one agent from a darwin_search result on the task. Only after a family member who can approve said YES. Copy searchId, agentId and capabilityId exactly. The brief must include every required input. One agent per task: if a run already exists you get it back instead of a second start. Progress arrives in this channel automatically.",
     input: z.object({
       taskId: z.string(),
+      searchId: z.string(),
       agentId: z.string(),
       capabilityId: z.string().optional(),
-      searchId: z.string().optional(),
-      request: z.string().min(10).max(1500),
+      brief: z.string().min(10).max(2000),
+    }),
+  },
+  darwin_check: {
+    description:
+      "Check the Darwin run on a task now: status, what the agent asked for, and the outcome. Updates also arrive here automatically.",
+    input: z.object({ taskId: z.string() }),
+  },
+  darwin_reply: {
+    description:
+      "Answer the Darwin agent's text question on the same thread. Only with facts the family or the elder's profile gave; never invent decisions, approvals, credentials or payment. Use a new operationId per answer.",
+    input: z.object({
+      taskId: z.string(),
+      text: z.string().min(1).max(1500),
+      operationId: z.string().min(1).max(100),
     }),
   },
   dial_call_business: {

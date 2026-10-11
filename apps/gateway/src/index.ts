@@ -2,7 +2,9 @@ import { serve } from "@hono/node-server";
 import { createApp } from "./app.js";
 import { handleCallFinished } from "./calls/results.js";
 import { DarwinClient } from "./darwin/client.js";
+import { createDarwinExecutor } from "./darwin/executor.js";
 import { liveDarwin, proxyDarwin } from "./darwin/service.js";
+import { startDarwinWatcher } from "./darwin/watcher.js";
 import { createDb } from "./db/client.js";
 import { DrizzleStore } from "./db/drizzle-store.js";
 import { DialClient } from "./dial/client.js";
@@ -25,7 +27,11 @@ const darwinClient = new DarwinClient({
   actKey: env.DARWIN_ACT_KEY,
   actEnabled: env.DARWIN_ACT_ENABLED,
 });
-const darwin = env.DARWIN_MODE === "live" ? liveDarwin(darwinClient) : proxyDarwin();
+const darwin = createDarwinExecutor({
+  darwin: env.DARWIN_MODE === "live" ? liveDarwin(darwinClient) : proxyDarwin(),
+  store,
+  log,
+});
 const omb = new OmbClient({ baseUrl: env.OMB_API_URL, token: env.OMB_API_TOKEN });
 const failover = createModelFailover({
   omb,
@@ -86,12 +92,19 @@ const server = serve({ fetch: app.fetch, port: env.PORT }, (info) =>
 );
 
 runDiscovery();
+const darwinWatcher = startDarwinWatcher({
+  executor: darwin,
+  store,
+  postToTeam: (elderId, text) => team.postToTeam(elderId, text),
+  log,
+});
 const poll = setInterval(runDiscovery, env.GROUP_POLL_SECONDS * 1000);
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.on(signal, () => {
     log.info("shutting down", { signal });
     clearInterval(poll);
+    darwinWatcher.stop();
     server.close(() => process.exit(0));
   });
 }

@@ -126,3 +126,61 @@ export const auditLog = sqliteTable("audit_log", {
   detail: text("detail"),
   at: createdAt(),
 });
+
+/**
+ * Darwin search results Nonna has seen, so Act can only target an agent that a real search
+ * actually returned (never an invented or misremembered id).
+ */
+export const darwinSearches = sqliteTable("darwin_searches", {
+  searchId: text("search_id").primaryKey(),
+  taskId: text("task_id").references(() => tasks.id),
+  mode: text("mode", { enum: ["live", "proxy"] }).notNull(),
+  /** The unmodified `response.agents` array. */
+  agents: text("agents", { mode: "json" }).notNull(),
+  createdAt: createdAt(),
+});
+
+/**
+ * One Darwin Act execution for a task. The row (with its idempotency key) is written BEFORE the
+ * outbound call; an uncertain start is never retried or rerouted to another agent.
+ */
+export const darwinRuns = sqliteTable(
+  "darwin_runs",
+  {
+    id: id(),
+    taskId: text("task_id")
+      .notNull()
+      .references(() => tasks.id),
+    mode: text("mode", { enum: ["live", "proxy"] }).notNull(),
+    searchId: text("search_id"),
+    agentId: text("agent_id").notNull(),
+    capabilityId: text("capability_id").notNull(),
+    agentName: text("agent_name"),
+    idempotencyKey: text("idempotency_key").notNull().unique(),
+    status: text("status", {
+      enum: [
+        "starting",
+        "running",
+        "needs_input",
+        "needs_review",
+        "unknown",
+        "failed",
+        "completed",
+      ],
+    }).notNull(),
+    actRequestId: text("act_request_id"),
+    threadId: text("thread_id"),
+    /** Requests the agent is waiting on (questions, approvals, sign-in, payment). */
+    pending: text("pending", { mode: "json" }),
+    /** Outcome evidence from the thread state, only set on completion. */
+    outcome: text("outcome", { mode: "json" }),
+    /** Number of thread messages seen, so the watcher only reports new ones. */
+    seenMessages: integer("seen_messages").notNull().default(0),
+    /** Replies already sent, keyed by operation id, so a retried reply is never sent twice. */
+    replies: text("replies", { mode: "json" }),
+    error: text("error"),
+    createdAt: createdAt(),
+    updatedAt: integer("updated_at", { mode: "timestamp" }),
+  },
+  (t) => [index("darwin_runs_task_idx").on(t.taskId), index("darwin_runs_status_idx").on(t.status)],
+);

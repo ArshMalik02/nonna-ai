@@ -1,11 +1,14 @@
 import { randomUUID } from "node:crypto";
 import { type CircleMember, type Elder, type Task, TaskStatus } from "@nonna/shared";
-import { and, asc, eq, gte, notInArray, or } from "drizzle-orm";
-import type { FamilyGroup, NewTask, NewTaskStep, Store } from "../store.js";
+import { and, asc, desc, eq, gte, inArray, notInArray, or } from "drizzle-orm";
+import type { DarwinAgent, DarwinPendingRequest } from "../darwin/types.js";
+import type { DarwinRun, FamilyGroup, NewTask, NewTaskStep, Store } from "../store.js";
 import type { Db } from "./client.js";
 import {
   auditLog,
   circleMembers,
+  darwinRuns,
+  darwinSearches,
   elders,
   familyGroups,
   inboundEvents,
@@ -52,6 +55,31 @@ const toTask = (r: typeof tasks.$inferSelect): Task => ({
   ...(r.dueAt ? { dueAt: r.dueAt.toISOString() } : {}),
   ...(r.ombThreadId ? { ombThreadId: r.ombThreadId } : {}),
 });
+
+type RunRow = typeof darwinRuns.$inferSelect;
+
+const toRun = (r: RunRow): DarwinRun => ({
+  id: r.id,
+  taskId: r.taskId,
+  mode: r.mode,
+  searchId: r.searchId ?? undefined,
+  agentId: r.agentId,
+  capabilityId: r.capabilityId,
+  agentName: r.agentName ?? undefined,
+  idempotencyKey: r.idempotencyKey,
+  status: r.status,
+  actRequestId: r.actRequestId ?? undefined,
+  threadId: r.threadId ?? undefined,
+  pending: (r.pending as DarwinPendingRequest[] | null) ?? [],
+  outcome: r.outcome ?? undefined,
+  seenMessages: r.seenMessages,
+  replies: (r.replies as DarwinRun["replies"] | null) ?? {},
+  error: r.error ?? undefined,
+});
+
+/** undefined → SQL NULL for optional columns. */
+const nulls = (o: object) =>
+  Object.fromEntries(Object.entries(o).map(([k, v]) => [k, v === undefined ? null : v]));
 
 export class DrizzleStore implements Store {
   constructor(private readonly db: Db) {}
@@ -186,6 +214,79 @@ export class DrizzleStore implements Store {
       summary: task.summary,
     });
     return task;
+  }
+
+  async saveDarwinSearch(search: {
+    searchId: string;
+    taskId?: string | undefined;
+    mode: "live" | "proxy";
+    agents: DarwinAgent[];
+  }) {
+    await this.db
+      .insert(darwinSearches)
+      .values({ ...search, taskId: search.taskId ?? null })
+      .onConflictDoNothing();
+  }
+
+  async getDarwinSearch(searchId: string) {
+    const [row] = await this.db
+      .select()
+      .from(darwinSearches)
+      .where(eq(darwinSearches.searchId, searchId))
+      .limit(1);
+    return row
+      ? { taskId: row.taskId ?? undefined, agents: row.agents as DarwinAgent[] }
+      : undefined;
+  }
+
+  async createDarwinRun(run: DarwinRun) {
+    await this.db.insert(darwinRuns).values({
+      id: run.id,
+      taskId: run.taskId,
+      mode: run.mode,
+      searchId: run.searchId ?? null,
+      agentId: run.agentId,
+      capabilityId: run.capabilityId,
+      agentName: run.agentName ?? null,
+      idempotencyKey: run.idempotencyKey,
+      status: run.status,
+      actRequestId: run.actRequestId ?? null,
+      threadId: run.threadId ?? null,
+      pending: run.pending,
+      outcome: run.outcome ?? null,
+      seenMessages: run.seenMessages,
+      replies: run.replies,
+      error: run.error ?? null,
+      updatedAt: new Date(),
+    });
+  }
+
+  async updateDarwinRun(id: string, patch: Partial<Omit<DarwinRun, "id" | "taskId">>) {
+    await this.db
+      .update(darwinRuns)
+      .set({ ...nulls(patch), updatedAt: new Date() })
+      .where(eq(darwinRuns.id, id));
+    const [row] = await this.db.select().from(darwinRuns).where(eq(darwinRuns.id, id)).limit(1);
+    if (!row) throw new Error(`No run ${id}`);
+    return toRun(row);
+  }
+
+  async latestDarwinRun(taskId: string) {
+    const [row] = await this.db
+      .select()
+      .from(darwinRuns)
+      .where(eq(darwinRuns.taskId, taskId))
+      .orderBy(desc(darwinRuns.createdAt), desc(darwinRuns.updatedAt))
+      .limit(1);
+    return row ? toRun(row) : undefined;
+  }
+
+  async listActiveDarwinRuns() {
+    const rows = await this.db
+      .select()
+      .from(darwinRuns)
+      .where(inArray(darwinRuns.status, ["running", "needs_input", "starting"]));
+    return rows.map(toRun);
   }
 
   async audit(entry: { actor: string; action: string; taskId?: string; detail?: string }) {

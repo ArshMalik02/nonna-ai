@@ -1,30 +1,18 @@
+import type { DarwinActReceipt, DarwinActRequest, DarwinSearchResult } from "./types.js";
+
 export interface DarwinClientOptions {
   baseUrl: string;
+  /** Application Search key (higher rate limits). Search also works anonymously. */
   searchKey?: string | undefined;
+  /** Account-owner key with agent:write, or a person's OAuth token with human:actions. */
   actKey?: string | undefined;
   actEnabled: boolean;
   fetch?: typeof fetch;
 }
 
-export interface DarwinContextItem {
-  type: "text" | "budget" | "deadline" | "pdf" | "image";
-  value: unknown;
-}
-
-export interface DarwinSearchInput {
-  query: string;
-  maxResults?: number;
-  /** Up to 10 typed items (location, time, budget...). */
-  context?: DarwinContextItem[];
-  previousResponseId?: string;
-  /** Only return agents we can actually start a thread with. */
-  requiresExecutableRoute?: boolean;
-}
-
 /**
- * Darwin discovery client. Search is public; Act is a gated pilot, so it stays behind
- * `DARWIN_ACT_ENABLED`. An HTTP 200 from Act is NOT completion — read the thread state.
- * https://darwin.so/docs
+ * Thin client for the live Darwin API. https://darwin.so/docs
+ * Act is a gated pilot, so it stays behind DARWIN_ACT_ENABLED.
  */
 export class DarwinClient {
   readonly #fetch: typeof fetch;
@@ -33,54 +21,74 @@ export class DarwinClient {
     this.#fetch = opts.fetch ?? fetch;
   }
 
-  search({ requiresExecutableRoute, ...input }: DarwinSearchInput) {
-    return this.#request("POST", "/api/v3/search", this.opts.searchKey, {
-      ...input,
+  search(input: { query: string; maxResults?: number; requiresExecutableRoute?: boolean }) {
+    const { requiresExecutableRoute, ...body } = input;
+    return this.#request<DarwinSearchResult>("POST", "/api/v3/search", this.opts.searchKey, {
+      ...body,
       ...(requiresExecutableRoute ? { filters: { requiresExecutableRoute: true } } : {}),
     });
   }
 
+  /** Starts a thread with exactly one target, or continues one (`threadId`). */
   act(input: {
-    searchId?: string;
+    targets?: { agentId: string; capabilityId: string }[];
     threadId?: string;
-    targets?: { agentId: string; capabilityId?: string }[];
-    message: unknown;
+    searchId?: string;
+    text: string;
     idempotencyKey: string;
   }) {
     if (!this.opts.actEnabled) throw new Error("Darwin Act is disabled (DARWIN_ACT_ENABLED=false)");
-    const { idempotencyKey, ...body } = input;
-    return this.#request("POST", "/api/v3/act", this.opts.actKey, body, {
-      "Idempotency-Key": idempotencyKey,
-    });
+    const { idempotencyKey, text, ...rest } = input;
+    return this.#request<DarwinActReceipt>(
+      "POST",
+      "/api/v3/act",
+      this.opts.actKey,
+      { ...rest, message: { type: "text", text } },
+      { "Idempotency-Key": idempotencyKey },
+    );
   }
 
   getActRequest(actRequestId: string) {
-    return this.#request(
+    return this.#request<DarwinActRequest>(
       "GET",
-      `/api/v3/act/requests/${encodeURIComponent(actRequestId)}?includeThreadState=true`,
+      `/api/v3/act/requests/${encodeURIComponent(actRequestId)}?includeThreadState=true&limit=100`,
       this.opts.actKey,
     );
   }
 
-  async #request(
+  async #request<T>(
     method: string,
     path: string,
     key: string | undefined,
     body?: unknown,
     headers: Record<string, string> = {},
-  ) {
+  ): Promise<T> {
     const res = await this.#fetch(new URL(path, this.opts.baseUrl), {
       method,
       headers: {
-        ...(key ? { Authorization: `Bearer ${key}` } : {}),
+        // Darwin's docs don't pin the header; send the key both ways it may be read.
+        ...(key ? { Authorization: `Bearer ${key}`, "x-api-key": key } : {}),
         ...(body ? { "Content-Type": "application/json" } : {}),
         ...headers,
       },
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
     if (!res.ok) {
-      throw new Error(`Darwin ${method} ${path} failed: ${res.status} ${await res.text()}`);
+      throw new DarwinHttpError(
+        res.status,
+        `Darwin ${method} ${path} failed: ${res.status} ${await res.text()}`,
+      );
     }
-    return (await res.json()) as unknown;
+    return (await res.json()) as T;
+  }
+}
+
+/** A definite HTTP answer from Darwin (as opposed to a network failure with an unknown outcome). */
+export class DarwinHttpError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
   }
 }

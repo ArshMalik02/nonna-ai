@@ -1,12 +1,20 @@
 import { createHash } from "node:crypto";
 import type { DarwinClient } from "./client.js";
 import { PROXY_AGENTS, type ProxyAgent } from "./proxy-catalog.js";
+import type {
+  DarwinActReceipt,
+  DarwinActRequest,
+  DarwinAgent,
+  DarwinPendingRequest,
+  DarwinSearchResult,
+  DarwinThreadMessage,
+} from "./types.js";
 
 /**
- * What Nonna's tools need from Darwin. Two implementations:
- * - `live`: the real Darwin Search/Act API.
- * - `proxy`: a local catalog of fictional agents (proxy-catalog.ts) with simulated Act, used
- *   while Darwin is unavailable. Results are always marked `mode: "proxy"` / `simulated: true`.
+ * What the gateway needs from Darwin. Two implementations with the same shapes:
+ * - `live`: the real Darwin Search / Act API.
+ * - `proxy`: a local catalog of fictional agents (proxy-catalog.ts) with simulated threads, used
+ *   while Darwin is unavailable. Everything it returns is marked `simulated: true`.
  */
 export interface DarwinService {
   readonly mode: "live" | "proxy";
@@ -14,30 +22,45 @@ export interface DarwinService {
     query: string;
     context?: string | undefined;
     maxResults?: number;
-  }): Promise<unknown>;
-  act(input: {
+  }): Promise<DarwinSearchResult>;
+  /** Starts one thread with one agent. */
+  start(input: {
     agentId: string;
-    capabilityId?: string | undefined;
+    capabilityId: string;
     searchId?: string | undefined;
-    request: string;
+    brief: string;
     idempotencyKey: string;
-  }): Promise<unknown>;
+  }): Promise<DarwinActReceipt>;
+  /** Reads the act request with each thread's state. */
+  read(actRequestId: string): Promise<DarwinActRequest>;
+  /** Continues an existing thread with a text answer. */
+  reply(input: {
+    threadId: string;
+    text: string;
+    idempotencyKey: string;
+  }): Promise<DarwinActReceipt>;
 }
 
-export function liveDarwin(client: Pick<DarwinClient, "search" | "act">): DarwinService {
+export function liveDarwin(
+  client: Pick<DarwinClient, "search" | "act" | "getActRequest">,
+): DarwinService {
   return {
     mode: "live",
     search: ({ query, context, maxResults = 5 }) =>
       client.search({ query: context ? `${query}\nContext: ${context}` : query, maxResults }),
-    act: ({ agentId, capabilityId, searchId, request, idempotencyKey }) =>
+    start: ({ agentId, capabilityId, searchId, brief, idempotencyKey }) =>
       client.act({
+        targets: [{ agentId, capabilityId }],
         ...(searchId ? { searchId } : {}),
-        targets: [{ agentId, ...(capabilityId ? { capabilityId } : {}) }],
-        message: { type: "text", text: request },
+        text: brief,
         idempotencyKey,
       }),
+    read: (actRequestId) => client.getActRequest(actRequestId),
+    reply: ({ threadId, text, idempotencyKey }) => client.act({ threadId, text, idempotencyKey }),
   };
 }
+
+// ── Proxy ──────────────────────────────────────────────────────────────────
 
 // Darwin itself refuses emergencies; so does the proxy (the gateway's safety rules handle them).
 const EMERGENCY =
@@ -60,7 +83,6 @@ export function scoreAgent(agent: ProxyAgent, query: string): { score: number; r
   const qWords = new Set(words(query));
   const reasons: string[] = [];
   let score = 0;
-
   for (const k of agent.keywords) {
     if (k.includes(" ") ? q.includes(k) : qWords.has(k)) {
       score += 3;
@@ -72,20 +94,54 @@ export function scoreAgent(agent: ProxyAgent, query: string): { score: number; r
   return { score, reasons: reasons.slice(0, 3) };
 }
 
-const id = (prefix: string, ...parts: string[]) =>
-  `${prefix}_${createHash("sha256").update(parts.join("|")).digest("hex").slice(0, 16)}`;
+const hash = (...parts: string[]) =>
+  createHash("sha256").update(parts.join("|")).digest("hex").slice(0, 16);
 
-export function proxyDarwin(agents: readonly ProxyAgent[] = PROXY_AGENTS): DarwinService {
+/** Proxy act ids encode the thread, so reads survive a gateway restart. */
+interface ProxyThread {
+  agentId: string;
+  brief: string;
+  startedAt: number;
+}
+const encode = (t: ProxyThread) =>
+  `proxyact_${Buffer.from(JSON.stringify(t)).toString("base64url")}`;
+function decode(id: string): ProxyThread {
+  if (!id.startsWith("proxyact_")) throw new Error(`Not a proxy act id: ${id}`);
+  return JSON.parse(
+    Buffer.from(id.slice("proxyact_".length), "base64url").toString(),
+  ) as ProxyThread;
+}
+
+export interface ProxyOptions {
+  agents?: readonly ProxyAgent[];
+  /** How long a simulated agent "works" before confirming. */
+  workMs?: number;
+  now?: () => number;
+}
+
+/**
+ * Proxy Darwin. Threads behave like real ones so the whole flow can be exercised:
+ * the agent acknowledges, asks for details when the brief is too thin, stops at a payment
+ * request for payment agents (never "pays"), and otherwise sends a completion confirmation
+ * with a confirmation code — all marked simulated.
+ */
+export function proxyDarwin(opts: ProxyOptions = {}): DarwinService {
+  const { agents = PROXY_AGENTS, workMs = 8_000, now = Date.now } = opts;
+  const answers = new Map<string, string[]>();
+
   return {
     mode: "proxy",
+
     async search({ query, context, maxResults = 5 }) {
-      const searchId = id("srch", query, context ?? "");
+      const searchId = `srch_proxy_${hash(query, context ?? "", String(now()))}`;
+      const base = { searchId, simulated: true, mode: "proxy" };
       if (EMERGENCY.test(query)) {
         return {
-          mode: "proxy",
-          searchId,
+          ...base,
           status: "no_match",
-          noMatchReason: "This sounds like an emergency. Call 911 or local emergency services.",
+          response: {
+            noMatchReason: "This sounds like an emergency. Call 911 or local emergency services.",
+          },
         };
       }
       const ranked = agents
@@ -95,50 +151,99 @@ export function proxyDarwin(agents: readonly ProxyAgent[] = PROXY_AGENTS): Darwi
         .slice(0, maxResults);
       if (ranked.length === 0) {
         return {
-          mode: "proxy",
-          searchId,
+          ...base,
           status: "no_match",
-          noMatchReason: "No proxy agent covers this. Use dial_call_business or ask the family.",
+          response: {
+            noMatchReason: "No proxy agent covers this. Use dial_call_business or ask the family.",
+          },
         };
       }
       return {
-        mode: "proxy",
-        searchId,
+        ...base,
         status: "ok",
-        agents: ranked.map(({ agent, reasons }) => ({
-          agentId: agent.agentId,
-          capabilityId: agent.capabilityId,
-          name: agent.name,
-          description: agent.description,
-          reasons,
-          requiredInputs: agent.requiredInputs,
-          priceHint: agent.priceHint ?? null,
-          leadTime: agent.leadTime ?? null,
-          accessibility: agent.accessibility ?? [],
-          readiness: "ready",
-          canStartThread: true,
-        })),
+        response: {
+          agents: ranked.map(
+            ({ agent, reasons }, i): DarwinAgent => ({
+              rank: i + 1,
+              agentId: agent.agentId,
+              capabilityId: agent.capabilityId,
+              name: agent.name,
+              description: agent.description,
+              reasons,
+              uncertainties: [],
+              requiredInputs: agent.requiredInputs,
+              priceHint: agent.priceHint ?? null,
+              leadTime: agent.leadTime ?? null,
+              accessibility: agent.accessibility ?? [],
+              readiness: "ready",
+              canStartThread: true,
+            }),
+          ),
+        },
       };
     },
 
-    async act({ agentId, request, idempotencyKey }) {
-      const agent = agents.find((x) => x.agentId === agentId);
-      if (!agent) throw new Error(`Unknown proxy agent ${agentId}`);
-      const confirmation = id("conf", idempotencyKey).slice(5, 13).toUpperCase();
-      const isPayment = agent.category === "payment";
+    async start({ agentId, brief }) {
+      if (!agents.some((a) => a.agentId === agentId))
+        throw new Error(`Unknown proxy agent ${agentId}`);
+      const id = encode({ agentId, brief, startedAt: now() });
+      return { actRequestId: id, status: "accepted", threads: [{ threadId: id }], simulated: true };
+    },
+
+    async read(actRequestId) {
+      const thread = decode(actRequestId);
+      const agent = agents.find((a) => a.agentId === thread.agentId);
+      const name = agent?.name ?? thread.agentId;
+      const given = answers.get(actRequestId) ?? [];
+      const messages: DarwinThreadMessage[] = [
+        {
+          type: "text",
+          role: "agent",
+          text: `${name} received the request and is working on it.`,
+          simulated: true,
+        },
+      ];
+      const requests: DarwinPendingRequest[] = [];
+
+      if (thread.brief.trim().length < 40 && given.length === 0) {
+        requests.push({
+          requestId: "proxy-question-1",
+          type: "question",
+          status: "pending",
+          text: `To book this, ${name} needs the address, the date and time, and anything they should know (mobility, preferences).`,
+        });
+      } else if (agent?.category === "payment") {
+        requests.push({
+          requestId: "proxy-payment-1",
+          type: "payment",
+          status: "pending",
+          text: "Payment is needed. Darwin would send a hosted checkout link to the family member who can pay.",
+          checkoutUrl: null,
+        });
+      } else if (now() - thread.startedAt >= workMs) {
+        const code = hash(actRequestId).slice(0, 8).toUpperCase();
+        messages.push({
+          type: "completion_confirmation",
+          role: "agent",
+          text: `${name} confirmed the request. Confirmation ${code}.`,
+          confirmationCode: code,
+          simulated: true,
+        });
+      }
       return {
-        mode: "proxy",
+        actRequestId,
+        status: "running",
+        threads: [{ threadId: actRequestId, state: { messages, requests } }],
+      };
+    },
+
+    async reply({ threadId, text }) {
+      answers.set(threadId, [...(answers.get(threadId) ?? []), text]);
+      return {
+        actRequestId: threadId,
+        status: "accepted",
+        threads: [{ threadId }],
         simulated: true,
-        actRequestId: id("act", idempotencyKey),
-        agent: { agentId, name: agent.name },
-        status: isPayment ? "awaiting_payment" : "completed",
-        confirmation: isPayment
-          ? null
-          : { code: confirmation, summary: `${agent.name} accepted the request: ${request}` },
-        ...(isPayment
-          ? { nextStep: "A hosted checkout link would go to the family member who can pay." }
-          : {}),
-        note: "SIMULATED by Nonna's proxy catalog while Darwin is unavailable: nothing real was booked, sent or paid.",
       };
     },
   };
