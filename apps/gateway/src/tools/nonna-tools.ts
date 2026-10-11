@@ -56,12 +56,8 @@ function buildServer(deps: NonnaToolsDeps) {
   const { store, dial, darwin, log } = deps;
   const now = () => deps.now?.() ?? new Date();
   const server = new McpServer({ name: "nonna-tools", version: "0.1.0" });
-  const tool = <N extends keyof typeof nonnaTools>(name: N) => ({
-    description: nonnaTools[name].description,
-    inputSchema: nonnaTools[name].input.shape,
-  });
 
-  server.registerTool("get_elder_profile", tool("get_elder_profile"), async ({ elderId }) => {
+  server.registerTool("get_elder_profile", { description: nonnaTools.get_elder_profile.description, inputSchema: nonnaTools.get_elder_profile.input.shape }, async ({ elderId }) => {
     const elder = await store.getElder(elderId);
     if (!elder) return fail(`Unknown elder ${elderId}.`);
     const circle = await store.listCircle(elderId);
@@ -85,7 +81,7 @@ function buildServer(deps: NonnaToolsDeps) {
     });
   });
 
-  server.registerTool("update_task", tool("update_task"), async ({ taskId, status }) => {
+  server.registerTool("update_task", { description: nonnaTools.update_task.description, inputSchema: nonnaTools.update_task.input.shape }, async ({ taskId, status }) => {
     const task = await store.getTask(taskId);
     if (!task) return fail(`Unknown task ${taskId}.`);
     if (!canTransition(task.status, status)) {
@@ -105,7 +101,7 @@ function buildServer(deps: NonnaToolsDeps) {
     return ok(`Task ${taskId} is now ${status}.`);
   });
 
-  server.registerTool("message_family", tool("message_family"), async ({ elderId, body }) => {
+  server.registerTool("message_family", { description: nonnaTools.message_family.description, inputSchema: nonnaTools.message_family.input.shape }, async ({ elderId, body }) => {
     const group = await store.getFamilyGroup(elderId);
     if (!group) return fail(`Elder ${elderId} has no family group yet. Nothing was sent.`);
     await dial.sendMessage({ groupId: group.dialGroupId, body });
@@ -113,7 +109,7 @@ function buildServer(deps: NonnaToolsDeps) {
     return ok("Sent to the family group.");
   });
 
-  server.registerTool("message_elder", tool("message_elder"), async ({ elderId, body }) => {
+  server.registerTool("message_elder", { description: nonnaTools.message_elder.description, inputSchema: nonnaTools.message_elder.input.shape }, async ({ elderId, body }) => {
     const elder = await store.getElder(elderId);
     if (!elder) return fail(`Unknown elder ${elderId}.`);
     await dial.sendMessage({ to: elder.phone, body });
@@ -123,7 +119,7 @@ function buildServer(deps: NonnaToolsDeps) {
 
   server.registerTool(
     "request_family_approval",
-    tool("request_family_approval"),
+    { description: nonnaTools.request_family_approval.description, inputSchema: nonnaTools.request_family_approval.input.shape },
     async ({ taskId, question }) => {
       const task = await store.getTask(taskId);
       if (!task) return fail(`Unknown task ${taskId}.`);
@@ -155,7 +151,7 @@ function buildServer(deps: NonnaToolsDeps) {
 
   server.registerTool(
     "schedule_reminder",
-    tool("schedule_reminder"),
+    { description: nonnaTools.schedule_reminder.description, inputSchema: nonnaTools.schedule_reminder.input.shape },
     async ({ taskId, fireAt, text }) => {
       const task = await store.getTask(taskId);
       if (!task) return fail(`Unknown task ${taskId}.`);
@@ -170,7 +166,7 @@ function buildServer(deps: NonnaToolsDeps) {
     },
   );
 
-  server.registerTool("darwin_search", tool("darwin_search"), async ({ taskId, kind, query }) => {
+  server.registerTool("darwin_search", { description: nonnaTools.darwin_search.description, inputSchema: nonnaTools.darwin_search.input.shape }, async ({ taskId, kind, query }) => {
     const task = await store.getTask(taskId);
     if (!task) return fail(`Unknown task ${taskId}.`);
     const elder = await store.getElder(task.elderId);
@@ -189,7 +185,7 @@ function buildServer(deps: NonnaToolsDeps) {
     );
   });
 
-  server.registerTool("dial_call_business", tool("dial_call_business"), async (input) => {
+  server.registerTool("dial_call_business", { description: nonnaTools.dial_call_business.description, inputSchema: nonnaTools.dial_call_business.input.shape }, async (input) => {
     const { taskId, to, goal } = input;
     const task = await store.getTask(taskId);
     if (!task) return fail(`Unknown task ${taskId}.`);

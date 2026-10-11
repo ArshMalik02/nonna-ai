@@ -3,6 +3,7 @@
   "ui": "stream",
   "agentGuidance": false,
   "globalEnv": ["DATABASE_URL"],
+  "globalPassThroughEnv": ["DEMO_DIAL_GROUP_ID", "DEMO_OMB_CHANNEL_ID"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
