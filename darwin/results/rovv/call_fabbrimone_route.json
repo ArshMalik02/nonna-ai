@@ -1,0 +1,8 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "D\u00e9part retenu : Grand-Place, 1000, Bruxelles. Destination retenue : A\u00e9roport de Bruxelles-Zaventem (BRU), Luchthaven Brussel Nationaal, 1930, Zaventem. Pas de forfait publi\u00e9 pour ce trajet : tarif au compteur = prise en charge 6.00 \u20ac (tarif nuit 22h-6h, heure 01:07) + 15.0 km \u00d7 3.30 \u20ac = 49.50 \u20ac. Aucun suppl\u00e9ment. Total : 55.50 \u20ac TTC. Itin\u00e9raire routier le plus rapide : 15.0 km, environ 20 min. Tarif calcul\u00e9 par le moteur officiel Taxis Fabbrimone \u00e0 partir des tarifs publi\u00e9s. Le prix final est confirm\u00e9 par la centrale lors de la r\u00e9servation. D\u00e9tail structur\u00e9 (JSON) : https://taxisfabbrimone.com/api/estimation-trajet"
+    }
+  ]
+}

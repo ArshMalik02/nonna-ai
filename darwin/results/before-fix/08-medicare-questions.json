@@ -1,0 +1,19 @@
+{
+  "searchId": "srch_2b9f0b3a-d5eb-42ed-acae-101fa9e1350e",
+  "responseId": "sresp_fafdd873-e7e7-4f52-9193-cdee4e25d193",
+  "previousResponseId": null,
+  "contractVersion": "search-v3.0",
+  "status": "needs_input",
+  "response": {
+    "agents": [],
+    "assessment": {
+      "outcome": "clarify",
+      "explanation": "I did not find sufficiently supported agent matches for this request. Try describing the specific capability you need."
+    },
+    "relatedSearches": [],
+    "plan": null,
+    "question": "Would you like to check eligibility for senior benefit programs, or do you have a specific program ID for which you'd like details?",
+    "noMatchReason": null,
+    "overview": "I did not find sufficiently supported agent matches for this request. Try describing the specific capability you need."
+  }
+}

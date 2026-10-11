@@ -1,0 +1,108 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "GeoArm Taxi \u2014 live prices and schedule (Tbilisi \u21c4 Yerevan)\nCurrencies: GEL, USD, AMD\nCars (car id: seats; price per passenger; whole vehicle):\n- sedan = sedan: 4 seats; 100 GEL / 42 USD / 14000 AMD per passenger; whole vehicle 400 GEL\n- minivan = minivan: 7 seats; 70 GEL / 29 USD / 10000 AMD per passenger; whole vehicle 450 GEL\n- sprinter = minibus (a seat on the scheduled minibus): 18 seats; 60 GEL / 25 USD / 8500 AMD per passenger; whole vehicle 900 GEL\nTbilisi \u2192 Yerevan (dir tbs-evn):\n- departure points (point id = name): avl = Tbilisi \u2014 Ortachala (Hotel Takhlaura, in front of the bus station); tbs-air = Tbilisi airport\n- departure times: 09:00, 11:00, 13:00, 15:00, 17:00, 19:00\nYerevan \u2192 Tbilisi (dir evn-tbs):\n- departure points (point id = name): evn-x = Yerevan \u2014 Railway station; evn-air = Zvartnots airport; lwn = Gyumri airport\n- departure times: 09:00, 11:00, 13:00, 15:00, 17:00, 19:00\nPick-up from an address: point \"@addr\" with `address` (extra fee, confirmed by the dispatcher).\nFacts: The ride takes 5\u20136 hours and crosses the border at Sadakhlo\u2013Bagratashen. Payment is in cash to the driver; nothing is paid online.\nA booking is a request: it is NOT confirmed until a GeoArm Taxi dispatcher contacts the passenger to confirm it."
+    }
+  ],
+  "structuredContent": {
+    "currencies": [
+      "GEL",
+      "USD",
+      "AMD"
+    ],
+    "cars": [
+      {
+        "car": "sedan",
+        "label": "sedan",
+        "seats": 4,
+        "price_per_passenger": {
+          "GEL": 100,
+          "USD": 42,
+          "AMD": 14000
+        },
+        "whole_vehicle_price": {
+          "GEL": 400
+        }
+      },
+      {
+        "car": "minivan",
+        "label": "minivan",
+        "seats": 7,
+        "price_per_passenger": {
+          "GEL": 70,
+          "USD": 29,
+          "AMD": 10000
+        },
+        "whole_vehicle_price": {
+          "GEL": 450
+        }
+      },
+      {
+        "car": "sprinter",
+        "label": "minibus (a seat on the scheduled minibus)",
+        "seats": 18,
+        "price_per_passenger": {
+          "GEL": 60,
+          "USD": 25,
+          "AMD": 8500
+        },
+        "whole_vehicle_price": {
+          "GEL": 900
+        }
+      }
+    ],
+    "directions": [
+      {
+        "dir": "tbs-evn",
+        "label": "Tbilisi \u2192 Yerevan",
+        "points": [
+          {
+            "id": "avl",
+            "name": "Tbilisi \u2014 Ortachala (Hotel Takhlaura, in front of the bus station)"
+          },
+          {
+            "id": "tbs-air",
+            "name": "Tbilisi airport"
+          }
+        ],
+        "times": [
+          "09:00",
+          "11:00",
+          "13:00",
+          "15:00",
+          "17:00",
+          "19:00"
+        ]
+      },
+      {
+        "dir": "evn-tbs",
+        "label": "Yerevan \u2192 Tbilisi",
+        "points": [
+          {
+            "id": "evn-x",
+            "name": "Yerevan \u2014 Railway station"
+          },
+          {
+            "id": "evn-air",
+            "name": "Zvartnots airport"
+          },
+          {
+            "id": "lwn",
+            "name": "Gyumri airport"
+          }
+        ],
+        "times": [
+          "09:00",
+          "11:00",
+          "13:00",
+          "15:00",
+          "17:00",
+          "19:00"
+        ]
+      }
+    ],
+    "address_pickup": true,
+    "facts": "The ride takes 5\u20136 hours and crosses the border at Sadakhlo\u2013Bagratashen. Payment is in cash to the driver; nothing is paid online."
+  }
+}

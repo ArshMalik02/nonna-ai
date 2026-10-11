@@ -1,0 +1,19 @@
+{
+  "searchId": "srch_f7a91de7-6d41-45dc-b2da-ee7ea4515ca9",
+  "responseId": "sresp_710ac53f-fb32-477a-b466-6b7b67886aed",
+  "previousResponseId": "sresp_2f9ef712-f048-4743-9830-70081348105d",
+  "contractVersion": "search-v3.0",
+  "status": "no_match",
+  "response": {
+    "agents": [],
+    "assessment": {
+      "outcome": "no_match",
+      "explanation": "I did not find sufficiently supported agent matches for this request. Try describing the specific capability you need."
+    },
+    "relatedSearches": [],
+    "plan": null,
+    "question": null,
+    "noMatchReason": "I did not find sufficiently supported agent matches for this request. Try describing the specific capability you need.",
+    "overview": "I did not find sufficiently supported agent matches for this request. Try describing the specific capability you need."
+  }
+}

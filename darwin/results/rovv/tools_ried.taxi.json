@@ -1,0 +1,1034 @@
+[
+  {
+    "name": "ried_taxi_get_quote",
+    "title": "Get live RIED.TAXI price",
+    "description": "Returns RIED.TAXI's current price for one journey, calculated by the ried.taxi backend (the only valid price source). Read-only: it never books or reserves anything. Returns quote_id (valid 30 min), status priced | manual_quote_required | not_offered, and the resolved pickup/destination - show those names to the customer. If the result is ambiguous_place, ask the customer which place they mean and resend with the postcode.",
+    "inputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "pickup_address": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 200,
+          "description": "Street address, hotel, town with postcode, or airport name/code (MUC, SZG, LNZ, VIE)."
+        },
+        "destination_address": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 200
+        },
+        "pickup_date": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "YYYY-MM-DD (Europe/Vienna)."
+        },
+        "pickup_time": {
+          "type": "string",
+          "pattern": "^([01]?\\d|2[0-3]):[0-5]\\d$",
+          "description": "HH:MM, 24h, Europe/Vienna."
+        },
+        "passengers": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "large_suitcases": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "flight_number": {
+          "type": "string",
+          "maxLength": 12
+        },
+        "stops": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "maxItems": 3,
+          "description": "Intermediate stops. Any stop means manual_quote_required."
+        },
+        "child_seats": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Ages of children needing a seat. Means manual_quote_required."
+        },
+        "special_requirements": {
+          "type": "string",
+          "maxLength": 300
+        }
+      },
+      "required": [
+        "pickup_address",
+        "destination_address",
+        "passengers"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        },
+        "error": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "priced",
+            "manual_quote_required",
+            "not_offered"
+          ]
+        },
+        "quote_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "price_eur": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "currency": {
+          "type": "string"
+        },
+        "price_type": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "fixed_published",
+            "fixed_calculated",
+            null
+          ]
+        },
+        "valid_until": {
+          "type": "string"
+        },
+        "included": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "waiting_rules": {
+          "type": "string"
+        },
+        "pickup_resolved": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "country": {
+              "type": "string"
+            },
+            "lat": {
+              "type": "number"
+            },
+            "lon": {
+              "type": "number"
+            },
+            "is_airport": {
+              "type": "boolean"
+            },
+            "match": {
+              "type": "string"
+            }
+          }
+        },
+        "destination_resolved": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "country": {
+              "type": "string"
+            },
+            "lat": {
+              "type": "number"
+            },
+            "lon": {
+              "type": "number"
+            },
+            "is_airport": {
+              "type": "boolean"
+            },
+            "match": {
+              "type": "string"
+            }
+          }
+        },
+        "promotion": {
+          "type": "null"
+        },
+        "candidates": {
+          "type": "array"
+        }
+      },
+      "required": [
+        "ok"
+      ],
+      "additionalProperties": true
+    },
+    "annotations": {
+      "title": "Get live RIED.TAXI price",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "ried_taxi_check_availability",
+    "title": "Check RIED.TAXI availability",
+    "description": "Checks RIED.TAXI's real calendar (bookings, the owner's own calendar and other customers' temporary holds). One car, one driver: availability depends on the whole day including driving to the pickup and back, not only the minute. Read-only; a free result is NOT a reservation. Returns alternatives when unavailable.",
+    "inputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "pickup_address": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "destination_address": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "pickup_date": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "YYYY-MM-DD (Europe/Vienna)."
+        },
+        "pickup_time": {
+          "type": "string",
+          "pattern": "^([01]?\\d|2[0-3]):[0-5]\\d$",
+          "description": "HH:MM, 24h, Europe/Vienna."
+        },
+        "passengers": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        }
+      },
+      "required": [
+        "pickup_date",
+        "pickup_time"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        },
+        "error": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "available": {
+          "type": "boolean"
+        },
+        "availability_ref": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "free",
+            "fits_around_existing_ride",
+            "unavailable",
+            "too_short_notice",
+            "in_the_past"
+          ]
+        },
+        "pickup_at": {
+          "type": "string"
+        },
+        "timezone": {
+          "type": "string"
+        },
+        "alternative_dates": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "alternative_times": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      },
+      "required": [
+        "ok"
+      ],
+      "additionalProperties": true
+    },
+    "annotations": {
+      "title": "Check RIED.TAXI availability",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "ried_taxi_recheck_availability",
+    "title": "Re-check the day before booking",
+    "description": "Re-checks that the quoted date is still free right before the booking. It does NOT block or reserve the day - RIED.TAXI only blocks a day with a created booking. Returns available=true/false (with alternative dates) and held=false. Call it when the customer wants to proceed, then show the summary and create the booking right after their explicit yes.",
+    "inputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "quote_id": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "pickup_date": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "YYYY-MM-DD (Europe/Vienna)."
+        },
+        "pickup_time": {
+          "type": "string",
+          "pattern": "^([01]?\\d|2[0-3]):[0-5]\\d$",
+          "description": "HH:MM, 24h, Europe/Vienna."
+        }
+      },
+      "required": [
+        "quote_id",
+        "pickup_date",
+        "pickup_time"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        },
+        "error": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "hold_id": {
+          "type": "string"
+        },
+        "held": {
+          "type": "boolean"
+        },
+        "available": {
+          "type": "boolean"
+        },
+        "alternative_dates": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "expires_at": {
+          "type": "string"
+        },
+        "expires_in_minutes": {
+          "type": "integer"
+        },
+        "pickup_date": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "ok"
+      ],
+      "additionalProperties": true
+    },
+    "annotations": {
+      "title": "Re-check the day before booking",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "ried_taxi_create_booking",
+    "title": "Create a confirmed RIED.TAXI booking",
+    "description": "Creates a REAL, CONFIRMED booking in RIED.TAXI's booking system and blocks the day. Only call after the customer has seen the complete trip and price and explicitly said yes. Requires the quote_id, customer_confirmed=true, accepted_terms=true and an idempotency_key (retrying with the same key never creates a second booking). Returns the booking reference and an access code for the customer.",
+    "inputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "idempotency_key": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 80,
+          "pattern": "^[A-Za-z0-9._:-]+$",
+          "description": "Unique key for this one intended action. Reuse it only when retrying the same action."
+        },
+        "quote_id": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "hold_id": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "first_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "last_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "phone": {
+          "type": "string",
+          "pattern": "^\\+[1-9][0-9 ()/-]{6,22}$",
+          "description": "Mobile number in international format, e.g. +43 660 1234567."
+        },
+        "email": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "language": {
+          "type": "string",
+          "enum": [
+            "en",
+            "de"
+          ]
+        },
+        "pickup_date": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "YYYY-MM-DD (Europe/Vienna)."
+        },
+        "pickup_time": {
+          "type": "string",
+          "pattern": "^([01]?\\d|2[0-3]):[0-5]\\d$",
+          "description": "Requested DRIVER PICKUP time, HH:MM Europe/Vienna. For an airport arrival this is normally the scheduled landing time; the driver monitors the flight."
+        },
+        "pickup_address": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 200,
+          "description": "Exact pickup address (street + number + town, hotel, or airport + terminal)."
+        },
+        "pickup_instructions": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "destination_address": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 200
+        },
+        "passengers": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "large_suitcases": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "hand_luggage": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "flight_number": {
+          "type": "string",
+          "maxLength": 12,
+          "description": "Required when picking up at an airport."
+        },
+        "flight_arrival_time": {
+          "type": "string",
+          "pattern": "^([01]?\\d|2[0-3]):[0-5]\\d$",
+          "description": "Scheduled landing time (local) - required for airport pickups."
+        },
+        "flight_departure_time": {
+          "type": "string",
+          "pattern": "^([01]?\\d|2[0-3]):[0-5]\\d$",
+          "description": "Scheduled departure time for rides TO the airport (optional)."
+        },
+        "stops": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 0,
+          "description": "Not bookable online; must be empty."
+        },
+        "child_seats": {
+          "type": "string",
+          "maxLength": 0,
+          "description": "Not bookable online; must be empty."
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 600,
+          "description": "Optional short note for the driver about the ride itself (e.g. meeting point details). Leave empty unless the customer asks to add something. Never repeat name, phone, email or other personal data here; the WhatsApp preference goes in whatsapp_opt_in."
+        },
+        "whatsapp_opt_in": {
+          "type": "boolean",
+          "description": "True only if the customer agreed to WhatsApp messages about this ride."
+        },
+        "accepted_terms": {
+          "type": "boolean",
+          "const": true,
+          "description": "Customer accepted that RIED.TAXI processes their details to carry out the ride (https://ried.taxi/en/privacy/) and the booking terms (https://ried.taxi/en/terms/; cancellation is free of charge)."
+        },
+        "customer_confirmed": {
+          "type": "boolean",
+          "const": true,
+          "description": "Customer saw the full booking summary and explicitly said to book it."
+        }
+      },
+      "required": [
+        "idempotency_key",
+        "quote_id",
+        "first_name",
+        "last_name",
+        "phone",
+        "language",
+        "pickup_date",
+        "pickup_time",
+        "pickup_address",
+        "destination_address",
+        "passengers",
+        "large_suitcases",
+        "whatsapp_opt_in",
+        "accepted_terms",
+        "customer_confirmed"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        },
+        "error": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "booking_id": {
+          "type": "string"
+        },
+        "booking_reference": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "pickup_at": {
+          "type": "string"
+        },
+        "pickup_date": {
+          "type": "string"
+        },
+        "pickup_time": {
+          "type": "string"
+        },
+        "timezone": {
+          "type": "string"
+        },
+        "pickup_address": {
+          "type": "string"
+        },
+        "destination": {
+          "type": "string"
+        },
+        "passengers": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "price_eur": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "currency": {
+          "type": "string"
+        },
+        "flight_number": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "free_cancellation_until": {
+          "type": "string"
+        },
+        "confirmation_url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "access_code": {
+          "type": "string"
+        },
+        "replayed": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "ok"
+      ],
+      "additionalProperties": true
+    },
+    "annotations": {
+      "title": "Create a confirmed RIED.TAXI booking",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "ried_taxi_get_booking",
+    "title": "Look up my RIED.TAXI booking",
+    "description": "Returns status, pickup time, addresses, price and flight of ONE booking. Requires the booking reference and the access code the customer received when booking. Read-only.",
+    "inputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "booking_reference": {
+          "type": "string",
+          "pattern": "^RT-[A-Z0-9]{4,10}$",
+          "description": "Public booking reference, e.g. RT-K7QM."
+        },
+        "access_code": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 8,
+          "description": "8-character access code given at booking time."
+        }
+      },
+      "required": [
+        "booking_reference",
+        "access_code"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        },
+        "error": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "booking_id": {
+          "type": "string"
+        },
+        "booking_reference": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "pickup_at": {
+          "type": "string"
+        },
+        "pickup_date": {
+          "type": "string"
+        },
+        "pickup_time": {
+          "type": "string"
+        },
+        "timezone": {
+          "type": "string"
+        },
+        "pickup_address": {
+          "type": "string"
+        },
+        "destination": {
+          "type": "string"
+        },
+        "passengers": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "price_eur": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "currency": {
+          "type": "string"
+        },
+        "flight_number": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "free_cancellation_until": {
+          "type": "string"
+        },
+        "confirmation_url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "ok"
+      ],
+      "additionalProperties": true
+    },
+    "annotations": {
+      "title": "Look up my RIED.TAXI booking",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "ried_taxi_update_booking",
+    "title": "Change my RIED.TAXI booking",
+    "description": "Changes a booking. Always call first with mode='preview' and show the result to the customer; then call with mode='apply', customer_confirmed=true and an idempotency_key. Same-day time changes, flight number, passengers (max 5), notes and new addresses with the same price apply immediately; a new date or a different price is sent to Ronald for approval (status change_requested).",
+    "inputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "booking_reference": {
+          "type": "string",
+          "pattern": "^RT-[A-Z0-9]{4,10}$",
+          "description": "Public booking reference, e.g. RT-K7QM."
+        },
+        "access_code": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 8,
+          "description": "8-character access code given at booking time."
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "preview",
+            "apply"
+          ]
+        },
+        "idempotency_key": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 80,
+          "pattern": "^[A-Za-z0-9._:-]+$",
+          "description": "Unique key for this one intended action. Reuse it only when retrying the same action."
+        },
+        "customer_confirmed": {
+          "type": "boolean"
+        },
+        "changes": {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "properties": {
+            "pickup_date": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "description": "YYYY-MM-DD (Europe/Vienna)."
+            },
+            "pickup_time": {
+              "type": "string",
+              "pattern": "^([01]?\\d|2[0-3]):[0-5]\\d$",
+              "description": "HH:MM, 24h, Europe/Vienna."
+            },
+            "pickup_address": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "destination_address": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "flight_number": {
+              "type": "string",
+              "maxLength": 12
+            },
+            "passengers": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5
+            },
+            "notes": {
+              "type": "string",
+              "maxLength": 400
+            }
+          }
+        }
+      },
+      "required": [
+        "booking_reference",
+        "access_code",
+        "mode",
+        "changes"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        },
+        "error": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "booking_id": {
+          "type": "string"
+        },
+        "booking_reference": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "pickup_at": {
+          "type": "string"
+        },
+        "pickup_date": {
+          "type": "string"
+        },
+        "pickup_time": {
+          "type": "string"
+        },
+        "timezone": {
+          "type": "string"
+        },
+        "pickup_address": {
+          "type": "string"
+        },
+        "destination": {
+          "type": "string"
+        },
+        "passengers": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "price_eur": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "currency": {
+          "type": "string"
+        },
+        "flight_number": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "free_cancellation_until": {
+          "type": "string"
+        },
+        "confirmation_url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "changes": {
+          "type": "object"
+        },
+        "handled": {
+          "type": "string",
+          "enum": [
+            "automatic",
+            "needs_ronald"
+          ]
+        },
+        "updated_fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "ok"
+      ],
+      "additionalProperties": true
+    },
+    "annotations": {
+      "title": "Change my RIED.TAXI booking",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "ried_taxi_cancel_booking",
+    "title": "Cancel my RIED.TAXI booking",
+    "description": "Cancels a booking, free of charge, any time before the pickup. Requires reference, access code, customer_confirmed=true after the customer explicitly confirmed, and an idempotency_key. Cannot be undone.",
+    "inputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "booking_reference": {
+          "type": "string",
+          "pattern": "^RT-[A-Z0-9]{4,10}$",
+          "description": "Public booking reference, e.g. RT-K7QM."
+        },
+        "access_code": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 8,
+          "description": "8-character access code given at booking time."
+        },
+        "idempotency_key": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 80,
+          "pattern": "^[A-Za-z0-9._:-]+$",
+          "description": "Unique key for this one intended action. Reuse it only when retrying the same action."
+        },
+        "customer_confirmed": {
+          "type": "boolean",
+          "const": true
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 200
+        }
+      },
+      "required": [
+        "booking_reference",
+        "access_code",
+        "idempotency_key",
+        "customer_confirmed"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        },
+        "error": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "booking_id": {
+          "type": "string"
+        },
+        "booking_reference": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "pickup_at": {
+          "type": "string"
+        },
+        "pickup_date": {
+          "type": "string"
+        },
+        "pickup_time": {
+          "type": "string"
+        },
+        "timezone": {
+          "type": "string"
+        },
+        "pickup_address": {
+          "type": "string"
+        },
+        "destination": {
+          "type": "string"
+        },
+        "passengers": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "price_eur": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "currency": {
+          "type": "string"
+        },
+        "flight_number": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "free_cancellation_until": {
+          "type": "string"
+        },
+        "confirmation_url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "cancelled_at": {
+          "type": "string"
+        },
+        "cancellation_fee_eur": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "ok"
+      ],
+      "additionalProperties": true
+    },
+    "annotations": {
+      "title": "Cancel my RIED.TAXI booking",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  }
+]

@@ -1,0 +1,19 @@
+{
+  "searchId": "srch_d7c91297-682c-4295-92b4-145d918b85c6",
+  "responseId": "sresp_4397f00e-a7d7-489d-91ac-b8c860ee7e5b",
+  "previousResponseId": null,
+  "contractVersion": "search-v3.0",
+  "status": "no_match",
+  "response": {
+    "agents": [],
+    "assessment": {
+      "outcome": "no_match",
+      "explanation": "I did not find an indexed capability for this request. Try a broader description of the task."
+    },
+    "relatedSearches": [],
+    "plan": null,
+    "question": null,
+    "noMatchReason": "I did not find an indexed capability for this request. Try a broader description of the task.",
+    "overview": "I did not find an indexed capability for this request. Try a broader description of the task."
+  }
+}
