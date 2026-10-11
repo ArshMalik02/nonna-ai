@@ -1,5 +1,7 @@
+import { timingSafeEqual } from "node:crypto";
 import { StreamableHTTPTransport } from "@hono/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { type Elder, TaskKind } from "@nonna/shared";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -7,8 +9,15 @@ import type { Store } from "../store.js";
 
 export interface ContextMcpDeps {
   store: Store;
+  /** Static secret Dial sends on every request (set when connecting the MCP). */
+  token: string | undefined;
   onEscalate: (args: { elderId: string; trigger: string }) => void;
 }
+
+export const CONTEXT_MCP_TOKEN_HEADER = "x-nonna-mcp-token";
+
+const safeEqual = (a: string, b: string) =>
+  a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
 
 const text = (t: string) => ({ content: [{ type: "text" as const, text: t }] });
 
@@ -18,8 +27,15 @@ const text = (t: string) => ({ content: [{ type: "text" as const, text: t }] });
  * their own profile, and unknown numbers are rejected. Tools must answer in well under a second —
  * never wait on an agent turn here.
  */
-function buildServer(elder: Elder, deps: ContextMcpDeps) {
+function buildServer(elder: Elder | undefined, deps: ContextMcpDeps) {
   const server = new McpServer({ name: "nonna-context", version: "0.0.0" });
+  // Any caller that is not a registered elder (family, businesses on outbound calls) gets an
+  // empty tool list (not an error, which Dial treats as a broken server).
+  if (!elder) {
+    server.server.registerCapabilities({ tools: {} });
+    server.server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: [] }));
+    return server;
+  }
 
   server.registerTool(
     "get_elder_profile",
@@ -72,9 +88,14 @@ export function contextMcpRoutes(deps: ContextMcpDeps) {
   const app = new Hono();
 
   app.all("/", async (c) => {
+    // The caller-number header is only trustworthy if the request really comes from Dial.
+    const token = c.req.header(CONTEXT_MCP_TOKEN_HEADER);
+    if (!deps.token || !token || !safeEqual(token, deps.token)) {
+      return c.json({ error: "unauthorized" }, 401);
+    }
+
     const caller = c.req.header("x-dial-user-number");
     const elder = caller ? await deps.store.findElderByPhone(caller) : undefined;
-    if (!elder) return c.json({ error: "unknown caller" }, 403);
 
     // Stateless: a fresh server per request, scoped to this caller only.
     const server = buildServer(elder, deps);

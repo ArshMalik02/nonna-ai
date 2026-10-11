@@ -23,7 +23,8 @@ CREATE TABLE `circle_members` (
 	`id` text PRIMARY KEY NOT NULL,
 	`elder_id` text NOT NULL,
 	`name` text NOT NULL,
-	`phone` text NOT NULL,
+	`phone` text,
+	`imessage_handle` text,
 	`relation` text NOT NULL,
 	`priority` integer DEFAULT 0 NOT NULL,
 	`can_approve` integer DEFAULT false NOT NULL,
@@ -33,6 +34,8 @@ CREATE TABLE `circle_members` (
 );
 --> statement-breakpoint
 CREATE INDEX `circle_elder_idx` ON `circle_members` (`elder_id`);--> statement-breakpoint
+CREATE INDEX `circle_phone_idx` ON `circle_members` (`phone`);--> statement-breakpoint
+CREATE INDEX `circle_handle_idx` ON `circle_members` (`imessage_handle`);--> statement-breakpoint
 CREATE TABLE `elders` (
 	`id` text PRIMARY KEY NOT NULL,
 	`name` text NOT NULL,
@@ -51,6 +54,7 @@ CREATE TABLE `family_groups` (
 	`dial_group_id` text PRIMARY KEY NOT NULL,
 	`elder_id` text NOT NULL,
 	`omb_channel_id` text,
+	`confirmed_at` integer,
 	FOREIGN KEY (`elder_id`) REFERENCES `elders`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint

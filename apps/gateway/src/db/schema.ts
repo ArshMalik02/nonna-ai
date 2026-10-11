@@ -28,14 +28,19 @@ export const circleMembers = sqliteTable(
       .notNull()
       .references(() => elders.id),
     name: text("name").notNull(),
-    phone: text("phone").notNull(),
+    phone: text("phone"),
+    imessageHandle: text("imessage_handle"),
     relation: text("relation").notNull(),
     priority: integer("priority").notNull().default(0),
     canApprove: integer("can_approve", { mode: "boolean" }).notNull().default(false),
     canPay: integer("can_pay", { mode: "boolean" }).notNull().default(false),
     isNearby: integer("is_nearby", { mode: "boolean" }).notNull().default(false),
   },
-  (t) => [index("circle_elder_idx").on(t.elderId)],
+  (t) => [
+    index("circle_elder_idx").on(t.elderId),
+    index("circle_phone_idx").on(t.phone),
+    index("circle_handle_idx").on(t.imessageHandle),
+  ],
 );
 
 export const familyGroups = sqliteTable("family_groups", {
@@ -44,6 +49,7 @@ export const familyGroups = sqliteTable("family_groups", {
     .notNull()
     .references(() => elders.id),
   ombChannelId: text("omb_channel_id"),
+  confirmedAt: integer("confirmed_at", { mode: "timestamp" }),
 });
 
 /** Every Dial webhook, keyed by X-Dial-Event-ID for at-least-once dedupe. */
@@ -120,3 +126,61 @@ export const auditLog = sqliteTable("audit_log", {
   detail: text("detail"),
   at: createdAt(),
 });
+
+/**
+ * Darwin search results Nonna has seen, so Act can only target an agent that a real search
+ * actually returned (never an invented or misremembered id).
+ */
+export const darwinSearches = sqliteTable("darwin_searches", {
+  searchId: text("search_id").primaryKey(),
+  taskId: text("task_id").references(() => tasks.id),
+  mode: text("mode", { enum: ["live", "proxy"] }).notNull(),
+  /** The unmodified `response.agents` array. */
+  agents: text("agents", { mode: "json" }).notNull(),
+  createdAt: createdAt(),
+});
+
+/**
+ * One Darwin Act execution for a task. The row (with its idempotency key) is written BEFORE the
+ * outbound call; an uncertain start is never retried or rerouted to another agent.
+ */
+export const darwinRuns = sqliteTable(
+  "darwin_runs",
+  {
+    id: id(),
+    taskId: text("task_id")
+      .notNull()
+      .references(() => tasks.id),
+    mode: text("mode", { enum: ["live", "proxy"] }).notNull(),
+    searchId: text("search_id"),
+    agentId: text("agent_id").notNull(),
+    capabilityId: text("capability_id").notNull(),
+    agentName: text("agent_name"),
+    idempotencyKey: text("idempotency_key").notNull().unique(),
+    status: text("status", {
+      enum: [
+        "starting",
+        "running",
+        "needs_input",
+        "needs_review",
+        "unknown",
+        "failed",
+        "completed",
+      ],
+    }).notNull(),
+    actRequestId: text("act_request_id"),
+    threadId: text("thread_id"),
+    /** Requests the agent is waiting on (questions, approvals, sign-in, payment). */
+    pending: text("pending", { mode: "json" }),
+    /** Outcome evidence from the thread state, only set on completion. */
+    outcome: text("outcome", { mode: "json" }),
+    /** Number of thread messages seen, so the watcher only reports new ones. */
+    seenMessages: integer("seen_messages").notNull().default(0),
+    /** Replies already sent, keyed by operation id, so a retried reply is never sent twice. */
+    replies: text("replies", { mode: "json" }),
+    error: text("error"),
+    createdAt: createdAt(),
+    updatedAt: integer("updated_at", { mode: "timestamp" }),
+  },
+  (t) => [index("darwin_runs_task_idx").on(t.taskId), index("darwin_runs_status_idx").on(t.status)],
+);

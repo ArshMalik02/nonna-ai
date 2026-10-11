@@ -41,6 +41,9 @@ importers:
       '@nonna/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@nonna/tools-mcp':
+        specifier: workspace:*
+        version: link:../../packages/nonna-tools-mcp
       drizzle-orm:
         specifier: ^0.45.4
         version: 0.45.4(@libsql/client@0.18.0)

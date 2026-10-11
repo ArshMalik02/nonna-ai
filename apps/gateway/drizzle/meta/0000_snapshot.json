@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "a6794c9e-5e14-4b3a-9cb8-f18730aeb935",
+  "id": "783d8fa6-8acb-4c76-b422-85edd0e9f079",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "approvals": {
@@ -171,7 +171,14 @@
           "name": "phone",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "imessage_handle": {
+          "name": "imessage_handle",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "relation": {
@@ -219,6 +226,20 @@
           "name": "circle_elder_idx",
           "columns": [
             "elder_id"
+          ],
+          "isUnique": false
+        },
+        "circle_phone_idx": {
+          "name": "circle_phone_idx",
+          "columns": [
+            "phone"
+          ],
+          "isUnique": false
+        },
+        "circle_handle_idx": {
+          "name": "circle_handle_idx",
+          "columns": [
+            "imessage_handle"
           ],
           "isUnique": false
         }
@@ -353,6 +374,13 @@
         "omb_channel_id": {
           "name": "omb_channel_id",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "confirmed_at": {
+          "name": "confirmed_at",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false

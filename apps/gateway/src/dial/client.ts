@@ -19,9 +19,19 @@ export interface PlaceCallInput {
   idempotencyKey?: string;
 }
 
+export interface DialGroup {
+  id: string;
+  channel: "imessage" | "whatsapp";
+  name: string | null;
+  createdAt: string;
+}
+
 export interface SendMessageInput {
   to?: string;
+  /** Group sends go out from whichever of our lines is in the group (the family line). */
   groupId?: string;
+  /** Required for direct sends: an E.164 number, number id, or nickname of one of our lines. */
+  fromNumber?: string;
   body: string;
   mediaUrls?: string[];
 }
@@ -39,7 +49,7 @@ export class DialClient {
   }
 
   /** Typing indicator is free; show it while Nonna works so the family sees activity. */
-  startTyping(input: { to?: string; groupId?: string }) {
+  setTyping(input: { toNumber?: string; groupId?: string; fromNumber?: string; value: boolean }) {
     return this.#request("POST", "/api/v1/typing", input);
   }
 
@@ -52,8 +62,8 @@ export class DialClient {
   }
 
   /** Dial cannot join groups; poll this to discover groups a family member added Nonna to. */
-  listGroups() {
-    return this.#request("GET", "/api/v1/groups");
+  async listGroups() {
+    return (await this.#request("GET", "/api/v1/groups")) as { groups: DialGroup[] };
   }
 
   async #request(
@@ -72,8 +82,21 @@ export class DialClient {
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
     if (!res.ok) {
-      throw new Error(`Dial ${method} ${path} failed: ${res.status} ${await res.text()}`);
+      throw new DialHttpError(
+        res.status,
+        `Dial ${method} ${path} failed: ${res.status} ${await res.text()}`,
+      );
     }
     return (await res.json()) as unknown;
+  }
+}
+
+/** A definite HTTP answer from Dial. 429 on a call means the number is already on a call. */
+export class DialHttpError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
   }
 }
