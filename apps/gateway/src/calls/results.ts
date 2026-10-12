@@ -109,8 +109,16 @@ export async function describeCall(
 }
 
 /** For `call.transcribed` (and failed outbound `call.ended`): fetch the call, tell the team. */
+/** Dial reports `status` as a string in events but as an object on some call records. */
+function statusText(status: unknown): string {
+  if (typeof status === "string") return status;
+  const s = status as { terminationType?: string; label?: string; state?: string } | null;
+  return s?.terminationType ?? s?.label ?? s?.state ?? "unknown";
+}
+
 export async function handleCallFinished(deps: CallResultDeps, callId: string) {
-  const { call } = (await deps.dial.getCall(callId)) as { call: DialCallRecord };
+  const { call: raw } = (await deps.dial.getCall(callId)) as { call: DialCallRecord };
+  const call = { ...raw, status: statusText(raw.status) };
   const message = await describeCall(deps, call);
   if (!message) {
     deps.log.info("call not linked to an elder", { callId, direction: call.direction });
