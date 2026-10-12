@@ -1,0 +1,19 @@
+{
+  "searchId": "srch_35acdaf0-a554-44de-9f20-c3555fca83ec",
+  "responseId": "sresp_635d41a9-dcda-41f3-b052-8b7334bbbd6a",
+  "previousResponseId": null,
+  "contractVersion": "search-v3.0",
+  "status": "needs_input",
+  "response": {
+    "agents": [],
+    "assessment": {
+      "outcome": "clarify",
+      "explanation": "I did not find sufficiently supported agent matches for this request. Try describing the specific capability you need."
+    },
+    "relatedSearches": [],
+    "plan": null,
+    "question": "Could you please clarify what you would like to do with the Uber API?",
+    "noMatchReason": null,
+    "overview": "I did not find sufficiently supported agent matches for this request. Try describing the specific capability you need."
+  }
+}

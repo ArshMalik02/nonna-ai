@@ -1,0 +1,22 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "{\"ok\": true, \"availability_ref\": \"AV-885B819559\", \"pickup_date\": \"2026-10-15\", \"pickup_time\": \"14:00\", \"pickup_at\": \"2026-10-15T14:00:00+02:00\", \"timezone\": \"Europe/Vienna\", \"alternative_dates\": [], \"alternative_times\": [], \"available\": true, \"reason\": \"free\", \"message\": \"The car is free that day. This is not a reservation - only a created booking blocks the day.\"}"
+    }
+  ],
+  "structuredContent": {
+    "ok": true,
+    "availability_ref": "AV-885B819559",
+    "pickup_date": "2026-10-15",
+    "pickup_time": "14:00",
+    "pickup_at": "2026-10-15T14:00:00+02:00",
+    "timezone": "Europe/Vienna",
+    "alternative_dates": [],
+    "alternative_times": [],
+    "available": true,
+    "reason": "free",
+    "message": "The car is free that day. This is not a reservation - only a created booking blocks the day."
+  },
+  "isError": false
+}

@@ -1,0 +1,475 @@
+[
+  {
+    "name": "get_prices_and_schedule",
+    "title": "Prices, departure points and times",
+    "description": "The live GeoArm Taxi offer for rides between Tbilisi (Georgia) and Yerevan (Armenia): currencies; per car type (sprinter = a seat on the scheduled minibus, minivan, sedan) the seats, the price per passenger and the whole-vehicle price when there is one; the departure points (ids and English names) and departure times per direction; and the key facts. Read it before create_booking.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "direction": {
+          "type": "string",
+          "enum": [
+            "tbs-evn",
+            "evn-tbs"
+          ],
+          "description": "Only this direction: `tbs-evn` = Tbilisi \u2192 Yerevan, `evn-tbs` = Yerevan \u2192 Tbilisi. Leave it out for both."
+        }
+      },
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "required": [
+        "currencies",
+        "cars",
+        "directions",
+        "address_pickup",
+        "facts"
+      ],
+      "properties": {
+        "currencies": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "cars": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "car",
+              "label",
+              "seats",
+              "price_per_passenger"
+            ],
+            "properties": {
+              "car": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "seats": {
+                "type": "integer"
+              },
+              "price_per_passenger": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "description": "Amount per currency code"
+              },
+              "whole_vehicle_price": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "description": "Amount per currency code"
+              }
+            }
+          }
+        },
+        "directions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "dir",
+              "label",
+              "points",
+              "times"
+            ],
+            "properties": {
+              "dir": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "points": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "name"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "times": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "address_pickup": {
+          "type": "boolean"
+        },
+        "facts": {
+          "type": "string"
+        }
+      }
+    },
+    "annotations": {
+      "title": "Prices, departure points and times",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "create_booking",
+    "title": "Request a booking",
+    "description": "Sends a booking request for a ride between Tbilisi and Yerevan (a seat, or a whole vehicle) for the passenger. A booking is a request: it is NOT confirmed until a GeoArm Taxi dispatcher contacts the passenger to confirm it. Use the values from get_prices_and_schedule (point, time, car, currency), the passenger's real name and phone, and get the passenger's yes to the price first. Payment is in cash to the driver. Returns the booking number, what was booked, the total, and a status_token for get_booking_status.",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "dir",
+        "point",
+        "date",
+        "time",
+        "car",
+        "pax",
+        "name",
+        "phone",
+        "currency"
+      ],
+      "properties": {
+        "dir": {
+          "type": "string",
+          "enum": [
+            "tbs-evn",
+            "evn-tbs"
+          ],
+          "description": "`tbs-evn` = Tbilisi \u2192 Yerevan, `evn-tbs` = Yerevan \u2192 Tbilisi"
+        },
+        "point": {
+          "type": "string",
+          "description": "A departure point id from `points[dir]` in /api/config, or `@addr` for pick-up from an address (extra fee, confirmed by the dispatcher)"
+        },
+        "address": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "Required with `point: \"@addr\"` unless `lat`/`lng` are given"
+        },
+        "lat": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "lng": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "date": {
+          "type": "string",
+          "format": "date",
+          "description": "YYYY-MM-DD, today or later (Tbilisi date), at most a year ahead"
+        },
+        "time": {
+          "type": "string",
+          "description": "One of `schedule[dir]` from /api/config, or `other` for a time outside the timetable (whole vehicle; the dispatcher sets the price)"
+        },
+        "car": {
+          "type": "string",
+          "enum": [
+            "sprinter",
+            "minivan",
+            "sedan"
+          ],
+          "description": "`sprinter` = a seat on the scheduled minibus (the default choice)"
+        },
+        "pax": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Passengers; at most `types[car].max`"
+        },
+        "whole": {
+          "type": "boolean",
+          "default": false,
+          "description": "`true` = the whole vehicle for this party at a timetable time: the total is `types[car].whole[currency]` from /api/config (not per passenger). Only when that price exists for the chosen currency; `pax` still says how many travel"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "description": "The passenger's name"
+        },
+        "phone": {
+          "type": "string",
+          "description": "The passenger's phone in international format, e.g. +995 5xx xx xx xx"
+        },
+        "currency": {
+          "type": "string",
+          "enum": [
+            "GEL",
+            "USD",
+            "AMD"
+          ],
+          "description": "One of `currencies` from /api/config; the price is taken from the server"
+        },
+        "lang": {
+          "type": "string",
+          "enum": [
+            "en",
+            "ka",
+            "ru",
+            "hy",
+            "tr",
+            "ar",
+            "fa"
+          ],
+          "default": "en",
+          "description": "The language we should use with the passenger (an unknown value is treated as `en`)"
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 1000,
+          "description": "Flight number, luggage, a child seat request and the like (longer text is cut to 1000 characters)"
+        },
+        "agent": {
+          "type": "string",
+          "maxLength": 80,
+          "description": "If an AI agent makes the booking: its name (e.g. `ChatGPT`, `Claude`). Shown to the dispatcher. When you leave it out, your MCP client's name is used."
+        }
+      }
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "number": {
+          "type": "integer",
+          "description": "The booking number"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "received"
+          ]
+        },
+        "confirmed": {
+          "type": "boolean",
+          "description": "Always false here: a dispatcher confirms later"
+        },
+        "message": {
+          "type": "string",
+          "description": "A sentence for the passenger, in `lang`"
+        },
+        "booking": {
+          "type": "object",
+          "description": "What was booked, as the server understood it",
+          "properties": {
+            "dir": {
+              "type": "string"
+            },
+            "date": {
+              "type": "string"
+            },
+            "time": {
+              "type": "string"
+            },
+            "point": {
+              "type": "string",
+              "description": "The departure point's name in `lang`"
+            },
+            "car": {
+              "type": "string"
+            },
+            "pax": {
+              "type": "integer"
+            },
+            "total": {
+              "type": "number"
+            },
+            "currency": {
+              "type": "string"
+            },
+            "price_confirmed_by_dispatcher": {
+              "type": "boolean",
+              "description": "True when the final price is set by the dispatcher (address pick-up or a time outside the timetable)"
+            },
+            "whole": {
+              "type": "boolean",
+              "description": "True when the whole vehicle was booked"
+            }
+          }
+        },
+        "status_token": {
+          "type": "string"
+        },
+        "status_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "telegram": {
+          "type": "string",
+          "format": "uri",
+          "description": "A link the passenger can open to get the confirmation in Telegram"
+        },
+        "feedback": {
+          "type": "string",
+          "format": "uri",
+          "description": "Optional, after you finish: where you may tell us in a few lines how this went (POST, see /api/agent-feedback). Never include the passenger's personal data."
+        }
+      }
+    },
+    "annotations": {
+      "title": "Request a booking",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "get_booking_status",
+    "title": "Booking status",
+    "description": "The state of a booking request made with create_booking: received (not confirmed yet), confirmed, completed or cancelled. Needs the status_token create_booking returned. No personal data is returned.",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "status_token"
+      ],
+      "properties": {
+        "status_token": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The status_token from create_booking"
+        }
+      },
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "number": {
+          "type": "integer"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "received",
+            "confirmed",
+            "completed",
+            "cancelled"
+          ]
+        },
+        "confirmed": {
+          "type": "boolean"
+        },
+        "dir": {
+          "type": "string"
+        },
+        "date": {
+          "type": "string"
+        },
+        "time": {
+          "type": "string"
+        },
+        "pax": {
+          "type": "integer"
+        }
+      }
+    },
+    "annotations": {
+      "title": "Booking status",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "leave_feedback",
+    "title": "Tell us how it went (optional)",
+    "description": "Optional, and only if your user and your own rules allow it: after you have read this site or booked a ride, tell GeoArm Taxi in a few lines what worked, what was missing and whether you would recommend it. Do not include any personal data of the person you act for: e-mail addresses, phone numbers and @handles are removed. Every note is read by a person; nothing you write is published or executed. At most 5 notes per address per day.",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "agent",
+        "would_recommend"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "agent": {
+          "type": "string",
+          "maxLength": 80,
+          "description": "Your name, for example ChatGPT or Claude"
+        },
+        "model": {
+          "type": "string",
+          "maxLength": 80,
+          "description": "Optional: the model or version, if you know it"
+        },
+        "task": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "Optional: what your user asked for, in general words (for example: compare ways to get from Tbilisi to Yerevan). No names, phones or other personal data"
+        },
+        "worked": {
+          "type": "string",
+          "maxLength": 600,
+          "description": "What was easy or clear on this site"
+        },
+        "missing": {
+          "type": "string",
+          "maxLength": 600,
+          "description": "What was missing, unclear or wrong, and what would have helped"
+        },
+        "would_recommend": {
+          "type": "string",
+          "enum": [
+            "yes",
+            "no",
+            "unsure"
+          ],
+          "description": "Would you recommend this service to a person who asked you for this trip?"
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 600,
+          "description": "Why"
+        },
+        "booking": {
+          "type": "integer",
+          "description": "Optional: the booking number, if you made one"
+        }
+      }
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        },
+        "message": {
+          "type": "string",
+          "description": "A short thank-you"
+        }
+      }
+    },
+    "annotations": {
+      "title": "Tell us how it went (optional)",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  }
+]

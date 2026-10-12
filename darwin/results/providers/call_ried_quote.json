@@ -1,0 +1,51 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "{\"ok\": true, \"currency\": \"EUR\", \"pickup_resolved\": {\"name\": \"Ried im Innkreis\", \"country\": \"AT\", \"lat\": 48.2112, \"lon\": 13.4886, \"is_airport\": false, \"match\": \"name_and_postcode\"}, \"destination_resolved\": {\"name\": \"Flughafen Salzburg (SZG)\", \"country\": \"AT\", \"lat\": 47.794, \"lon\": 13.0043, \"is_airport\": true, \"match\": \"airport_name\"}, \"road_km_estimate\": 79, \"passengers\": 1, \"pickup_date\": null, \"flight_number_required\": false, \"flight_info\": \"Optional: ask for the departure time only if the customer is flying out of that airport.\", \"pickup_time\": null, \"promotion\": null, \"included\": [\"motorway tolls\", \"airport parking\", \"flight monitoring\", \"first 60 minutes of waiting at the airport\"], \"waiting_rules\": \"First hour of airport waiting is free; after that EUR 10 per started 15 minutes. No night or Sunday surcharge.\", \"vehicle\": \"Tesla Model X, max 5 passengers\", \"price_basis\": \"per vehicle, one way, not per person\", \"status\": \"priced\", \"quote_id\": \"Q8b42ceb832a0a73c\", \"price_eur\": 160.0, \"price_type\": \"fixed_published\", \"price_detail\": \"szg\", \"valid_until\": \"2026-10-12T01:37:32+02:00\"}"
+    }
+  ],
+  "structuredContent": {
+    "ok": true,
+    "currency": "EUR",
+    "pickup_resolved": {
+      "name": "Ried im Innkreis",
+      "country": "AT",
+      "lat": 48.2112,
+      "lon": 13.4886,
+      "is_airport": false,
+      "match": "name_and_postcode"
+    },
+    "destination_resolved": {
+      "name": "Flughafen Salzburg (SZG)",
+      "country": "AT",
+      "lat": 47.794,
+      "lon": 13.0043,
+      "is_airport": true,
+      "match": "airport_name"
+    },
+    "road_km_estimate": 79,
+    "passengers": 1,
+    "pickup_date": null,
+    "flight_number_required": false,
+    "flight_info": "Optional: ask for the departure time only if the customer is flying out of that airport.",
+    "pickup_time": null,
+    "promotion": null,
+    "included": [
+      "motorway tolls",
+      "airport parking",
+      "flight monitoring",
+      "first 60 minutes of waiting at the airport"
+    ],
+    "waiting_rules": "First hour of airport waiting is free; after that EUR 10 per started 15 minutes. No night or Sunday surcharge.",
+    "vehicle": "Tesla Model X, max 5 passengers",
+    "price_basis": "per vehicle, one way, not per person",
+    "status": "priced",
+    "quote_id": "Q8b42ceb832a0a73c",
+    "price_eur": 160.0,
+    "price_type": "fixed_published",
+    "price_detail": "szg",
+    "valid_until": "2026-10-12T01:37:32+02:00"
+  },
+  "isError": false
+}

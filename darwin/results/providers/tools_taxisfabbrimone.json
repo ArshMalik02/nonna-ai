@@ -1,0 +1,162 @@
+[
+  {
+    "name": "get_business_details",
+    "description": "Coordonn\u00e9es et informations g\u00e9n\u00e9rales de Taxis Fabbrimone (adresse, t\u00e9l\u00e9phone, horaires, zone desservie, processus de confirmation).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "calculate_route",
+    "description": "Calcule le prix estim\u00e9 d'un trajet entre deux adresses, comme le calculateur interactif du site. Utilise d'abord la grille de forfaits fixes publi\u00e9e ; si aucun forfait ne correspond, g\u00e9olocalise les deux adresses et calcule la distance de conduite r\u00e9elle pour une estimation au tarif kilom\u00e9trique. Fonctionne avec des adresses libres, pas seulement les communes connues.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "origin": {
+          "type": "string",
+          "description": "Adresse ou commune de d\u00e9part."
+        },
+        "destination": {
+          "type": "string",
+          "description": "Adresse ou commune de destination."
+        },
+        "time": {
+          "type": "string",
+          "description": "Heure de d\u00e9part HH:MM (optionnel, d\u00e9termine le tarif jour/nuit si hors forfait fixe)."
+        },
+        "vehicle_type": {
+          "type": "string",
+          "enum": [
+            "berline",
+            "minivan",
+            "van",
+            "limousine"
+          ],
+          "description": "Type de v\u00e9hicule (optionnel)."
+        }
+      },
+      "required": [
+        "origin",
+        "destination"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "search_site",
+    "description": "Recherche par mot-cl\u00e9 parmi les pages principales de taxisfabbrimone.com et renvoie les plus pertinentes avec leur URL.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Termes de recherche, ex: \"a\u00e9roport\", \"tarifs\", \"r\u00e9servation\"."
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "book_ride",
+    "description": "Cr\u00e9e une VRAIE demande de r\u00e9servation, transmise \u00e0 la centrale Taxis Fabbrimone en remplissant et en soumettant le vrai formulaire du site (m\u00eame circuit que le formulaire du site). Action \u00e0 cons\u00e9quence r\u00e9elle : \u00e0 n'utiliser qu'apr\u00e8s confirmation explicite de l'utilisateur humain, jamais de mani\u00e8re sp\u00e9culative. Exige un d\u00e9lai d'au moins 12h avant l'heure de prise en charge \u2014 refus\u00e9 sinon. Ne cr\u00e9e pas de confirmation finale imm\u00e9diate : un accus\u00e9 de r\u00e9ception est envoy\u00e9 par e-mail, la centrale confirme ensuite. Aucun suivi GPS en temps r\u00e9el disponible \u00e0 ce jour.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "pickup_address": {
+          "type": "string",
+          "description": "Adresse compl\u00e8te de prise en charge."
+        },
+        "destination_address": {
+          "type": "string",
+          "description": "Adresse compl\u00e8te de destination."
+        },
+        "date": {
+          "type": "string",
+          "description": "Date de prise en charge, format AAAA-MM-JJ."
+        },
+        "time": {
+          "type": "string",
+          "description": "Heure de prise en charge, format HH:MM (24h)."
+        },
+        "name": {
+          "type": "string",
+          "description": "Nom complet du passager."
+        },
+        "phone": {
+          "type": "string",
+          "description": "Num\u00e9ro de t\u00e9l\u00e9phone du passager."
+        },
+        "email": {
+          "type": "string",
+          "description": "E-mail du passager (re\u00e7oit l'accus\u00e9 de r\u00e9ception)."
+        },
+        "passengers": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8,
+          "description": "Nombre de passagers (d\u00e9faut 1)."
+        },
+        "luggage": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5,
+          "description": "Nombre de bagages (d\u00e9faut 0)."
+        },
+        "vehicle_type": {
+          "type": "string",
+          "enum": [
+            "berline",
+            "minivan",
+            "limousine"
+          ],
+          "description": "Type de v\u00e9hicule (d\u00e9faut berline)."
+        },
+        "baby_seat_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4,
+          "description": "Nombre de si\u00e8ges enfant (d\u00e9faut 0)."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Demandes sp\u00e9ciales ou instructions particuli\u00e8res."
+        }
+      },
+      "required": [
+        "pickup_address",
+        "destination_address",
+        "date",
+        "time",
+        "name",
+        "phone",
+        "email"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "openWorldHint": true
+    }
+  }
+]

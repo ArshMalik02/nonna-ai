@@ -1,0 +1,223 @@
+[
+  {
+    "name": "search_places",
+    "description": "Search for a location by name. Returns a list of matching places with addresses. Use this to find the pickup or dropoff location before booking a ride.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "The place name or address to search for, e.g. \"Lekki Phase 1\" or \"Murtala Muhammed Airport\""
+        },
+        "lat": {
+          "type": "number",
+          "description": "Optional latitude to bias results toward the user's area"
+        },
+        "lng": {
+          "type": "number",
+          "description": "Optional longitude to bias results toward the user's area"
+        }
+      },
+      "required": [
+        "query"
+      ]
+    }
+  },
+  {
+    "name": "get_place_details",
+    "description": "Get the exact coordinates and full address for a place using its place_id (returned from search_places). Call this after search_places to get lat/lng needed for fare estimates and booking.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "place_id": {
+          "type": "string",
+          "description": "The Google place_id from a search_places result"
+        }
+      },
+      "required": [
+        "place_id"
+      ]
+    }
+  },
+  {
+    "name": "get_fare_estimate",
+    "description": "Get available vehicle types and fare estimates for a trip. Returns a list of vehicle options with prices, ETAs, and vehicle type IDs needed for booking.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "pick_lat": {
+          "type": "number",
+          "description": "Pickup latitude"
+        },
+        "pick_lng": {
+          "type": "number",
+          "description": "Pickup longitude"
+        },
+        "drop_lat": {
+          "type": "number",
+          "description": "Dropoff latitude"
+        },
+        "drop_lng": {
+          "type": "number",
+          "description": "Dropoff longitude"
+        },
+        "pick_address": {
+          "type": "string",
+          "description": "Pickup address text"
+        },
+        "drop_address": {
+          "type": "string",
+          "description": "Dropoff address text"
+        }
+      },
+      "required": [
+        "pick_lat",
+        "pick_lng",
+        "drop_lat",
+        "drop_lng"
+      ]
+    }
+  },
+  {
+    "name": "book_ride",
+    "description": "Book a Rovv ride. Requires pickup/dropoff coordinates, a vehicle_type ID (from get_fare_estimate), and payment method. Returns booking confirmation with ride number.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "pick_lat": {
+          "type": "number",
+          "description": "Pickup latitude"
+        },
+        "pick_lng": {
+          "type": "number",
+          "description": "Pickup longitude"
+        },
+        "drop_lat": {
+          "type": "number",
+          "description": "Dropoff latitude"
+        },
+        "drop_lng": {
+          "type": "number",
+          "description": "Dropoff longitude"
+        },
+        "pick_address": {
+          "type": "string",
+          "description": "Pickup address text"
+        },
+        "drop_address": {
+          "type": "string",
+          "description": "Dropoff address text"
+        },
+        "vehicle_type": {
+          "type": "string",
+          "description": "The zone_type_id from get_fare_estimate results"
+        },
+        "payment_opt": {
+          "type": "integer",
+          "description": "Payment method: 0 = card, 1 = cash, 2 = wallet",
+          "default": 1
+        },
+        "is_later": {
+          "type": "boolean",
+          "description": "Set to true for scheduled rides",
+          "default": false
+        },
+        "trip_start_time": {
+          "type": "string",
+          "description": "For scheduled rides: datetime in Y-m-d H:i:s format"
+        }
+      },
+      "required": [
+        "pick_lat",
+        "pick_lng",
+        "drop_lat",
+        "drop_lng",
+        "pick_address",
+        "drop_address",
+        "vehicle_type"
+      ]
+    }
+  },
+  {
+    "name": "cancel_ride",
+    "description": "Cancel an active ride. Optionally provide a reason.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "request_id": {
+          "type": "string",
+          "description": "The ride request ID to cancel. If not provided, cancels the current active ride."
+        },
+        "reason": {
+          "type": "string",
+          "description": "Optional cancellation reason"
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "get_current_ride",
+    "description": "Get the status of the user's current active ride, including driver details, ETA, and ride status.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  {
+    "name": "get_ride_history",
+    "description": "Get the user's past ride history. Returns recent completed and cancelled rides.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "integer",
+          "description": "Number of rides to return (default 5, max 20)",
+          "default": 5
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "get_route_info",
+    "description": "Get driving route information between two points including distance, duration, and polyline.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "pickup_lat": {
+          "type": "number",
+          "description": "Pickup latitude"
+        },
+        "pickup_lng": {
+          "type": "number",
+          "description": "Pickup longitude"
+        },
+        "drop_lat": {
+          "type": "number",
+          "description": "Dropoff latitude"
+        },
+        "drop_lng": {
+          "type": "number",
+          "description": "Dropoff longitude"
+        }
+      },
+      "required": [
+        "pickup_lat",
+        "pickup_lng",
+        "drop_lat",
+        "drop_lng"
+      ]
+    }
+  },
+  {
+    "name": "get_wallet_balance",
+    "description": "Get the user's Rovv wallet balance, total added, total spent, and recent transactions.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  }
+]
