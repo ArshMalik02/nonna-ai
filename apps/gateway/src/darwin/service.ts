@@ -18,6 +18,8 @@ import type {
  */
 export interface DarwinService {
   readonly mode: "live" | "proxy";
+  /** For mixed services (auto mode): which side an agent or act id belongs to. */
+  modeOf?(agentOrActId: string): "live" | "proxy";
   search(input: {
     query: string;
     context?: string | undefined;
@@ -246,5 +248,60 @@ export function proxyDarwin(opts: ProxyOptions = {}): DarwinService {
         simulated: true,
       };
     },
+  };
+}
+
+// ── Auto: live Darwin when it works, placeholders when it doesn't ───────────
+
+const PROXY_AGENT = /^proxy\./;
+const PROXY_ACT = /^proxyact_/;
+
+/**
+ * `auto` mode. Search asks live Darwin first; if it answers in time with at least one agent we
+ * can actually start a thread with, Nonna uses it. Otherwise (Darwin down, slow, or only
+ * matches that aren't runnable yet) the proxy catalog answers, with a note on what live Darwin
+ * said. Act, read and reply go to whichever side the agent or thread came from.
+ */
+export function autoDarwin(
+  live: DarwinService,
+  proxy: DarwinService,
+  log?: { warn: (m: string, f?: Record<string, unknown>) => void },
+): DarwinService & {
+  modeOf(agentOrActId: string): "live" | "proxy";
+} {
+  const modeOf = (id: string) => (PROXY_AGENT.test(id) || PROXY_ACT.test(id) ? "proxy" : "live");
+  return {
+    mode: "live",
+    modeOf,
+
+    async search(input) {
+      let liveNote: Record<string, unknown>;
+      try {
+        const result = await live.search(input);
+        const agents = result.response?.agents ?? [];
+        if (agents.some((a) => a.canStartThread === true)) return { ...result, mode: "live" };
+        liveNote = {
+          status: result.status,
+          agentsFound: agents.map((a) => a.name ?? a.agentId),
+          note: agents.length
+            ? "Live Darwin found agents, but none can be started yet. Showing demo providers instead."
+            : (result.response?.noMatchReason ??
+              result.response?.question ??
+              "Live Darwin found no match."),
+        };
+      } catch (err) {
+        log?.warn("live darwin search failed; using proxy", { error: String(err) });
+        liveNote = {
+          status: "unavailable",
+          note: "Live Darwin is unavailable. Showing demo providers instead.",
+        };
+      }
+      const fallback = await proxy.search(input);
+      return { ...fallback, liveDarwin: liveNote };
+    },
+
+    start: (input) => (modeOf(input.agentId) === "proxy" ? proxy : live).start(input),
+    read: (id) => (modeOf(id) === "proxy" ? proxy : live).read(id),
+    reply: (input) => (modeOf(input.threadId) === "proxy" ? proxy : live).reply(input),
   };
 }

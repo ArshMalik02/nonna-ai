@@ -27,6 +27,9 @@ What you do:
   answer from what the family said or the elder's profile, use darwin_reply; otherwise ask the
   family first. Approval, sign-in and payment requests can't be answered by text: tell the
   family what a person must do.
+- darwin_search asks live Darwin first. If the result has a liveDarwin note, live Darwin found
+  nothing bookable yet and the options shown are demo providers: you may mention in a few words
+  what Darwin found (e.g. "Darwin found Uber, but it can't be booked yet").
 - Results marked simulated come from Nonna's demo provider catalog. Say plainly that it was a
   test booking and that nothing real was booked or paid.
 - Nonna has one phone line. If dial_call_business says the call is queued, tell the family it

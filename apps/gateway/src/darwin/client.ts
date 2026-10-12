@@ -7,6 +7,8 @@ export interface DarwinClientOptions {
   /** Account-owner key with agent:write, or a person's OAuth token with human:actions. */
   actKey?: string | undefined;
   actEnabled: boolean;
+  /** Give up on a Darwin request after this long (Search can be slow or down). */
+  timeoutMs?: number;
   fetch?: typeof fetch;
 }
 
@@ -72,6 +74,7 @@ export class DarwinClient {
         ...headers,
       },
       ...(body ? { body: JSON.stringify(body) } : {}),
+      signal: AbortSignal.timeout(this.opts.timeoutMs ?? 15_000),
     });
     if (!res.ok) {
       throw new DarwinHttpError(
