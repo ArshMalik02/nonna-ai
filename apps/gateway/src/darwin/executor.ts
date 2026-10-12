@@ -45,7 +45,8 @@ export function createDarwinExecutor({ darwin, store, log }: ExecutorDeps) {
       await store.saveDarwinSearch({
         searchId: result.searchId,
         taskId: input.taskId,
-        mode: darwin.mode,
+        // In auto mode a search may have been answered by the proxy.
+        mode: result.mode === "proxy" ? "proxy" : darwin.mode,
         agents,
       });
     }
@@ -91,7 +92,7 @@ export function createDarwinExecutor({ darwin, store, log }: ExecutorDeps) {
     const run: DarwinRun = {
       id: randomUUID(),
       taskId: input.taskId,
-      mode: darwin.mode,
+      mode: darwin.modeOf?.(agent.agentId) ?? darwin.mode,
       searchId: input.searchId,
       agentId: agent.agentId,
       capabilityId: agent.capabilityId,

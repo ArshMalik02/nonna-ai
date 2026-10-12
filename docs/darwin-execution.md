@@ -32,16 +32,29 @@ family agrees in iMessage ─► Nonna bot ─ darwin_search ─► Darwin Searc
   `completion_confirmation`. The act request's own `completed` status only means the hand-off
   finished.
 
-## Modes
+## Modes (`DARWIN_MODE`)
 
-- `DARWIN_MODE=proxy` (default while Darwin is down): 60 fictional agents across Nonna's use cases
-  (`proxy-catalog.ts`), returned in Darwin's documented shape (`response.agents`). Threads are
-  simulated: the agent acknowledges, asks a question if the brief is thin, stops at a payment
-  request for payment agents, otherwise confirms with a code. Everything is marked `simulated`.
-- `DARWIN_MODE=live`: real Search and Act. Needs `DARWIN_ACT_ENABLED=true` and `DARWIN_ACT_KEY`
-  (an account-owner key with `agent:write`, or a person's OAuth grant with `human:actions`; a
-  Search key alone can't act). The key is sent as both `Authorization: Bearer` and `x-api-key`
-  until Darwin's reference pins one.
+- `auto` (default): every search goes to live Darwin first (10 s limit). If it returns an agent
+  with `canStartThread: true`, Nonna uses it and Act runs live. If Darwin is down, slow, or only
+  finds agents that can't be started yet, the proxy catalog answers, with a `liveDarwin` note
+  saying what Darwin found. Runs go to whichever side their agent came from. As soon as Darwin
+  has runnable agents (and Act access), Nonna uses them with no code change.
+- `proxy`: only the 60 fictional agents (`proxy-catalog.ts`), returned in Darwin's documented
+  shape (`response.agents`). Threads are simulated: the agent acknowledges, asks a question if the
+  brief is thin, stops at a payment request for payment agents, otherwise confirms with a code.
+  Everything is marked `simulated`.
+- `live`: real Search and Act only. Act needs `DARWIN_ACT_ENABLED=true` and `DARWIN_ACT_KEY` (an
+  account-owner key with `agent:write`, or a person's OAuth grant with `human:actions`; a Search
+  key alone can't act). The key is sent as both `Authorization: Bearer` and `x-api-key` until
+  Darwin's reference pins one.
+
+## The `darwin/` folder
+
+Our Darwin research and tooling (Python): a Search/Act client, an HTTP API with an admin-approval
+guard, the direct ride-provider path (RIED.TAXI), and recorded real Darwin results under
+`darwin/results/`. See [`darwin/USE_DARWIN.md`](../darwin/USE_DARWIN.md) and
+[`darwin/RIDE_FINDINGS.md`](../darwin/RIDE_FINDINGS.md). The gateway talks to Darwin directly with
+the same API; the recorded results are what live Search returned while we built this.
 
 ## Still needed for live
 

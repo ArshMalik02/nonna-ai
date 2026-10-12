@@ -4,7 +4,7 @@ import { createCallLine } from "./calls/line.js";
 import { handleCallFinished } from "./calls/results.js";
 import { DarwinClient } from "./darwin/client.js";
 import { createDarwinExecutor } from "./darwin/executor.js";
-import { liveDarwin, proxyDarwin } from "./darwin/service.js";
+import { autoDarwin, liveDarwin, proxyDarwin } from "./darwin/service.js";
 import { startDarwinWatcher } from "./darwin/watcher.js";
 import { createDb } from "./db/client.js";
 import { DrizzleStore } from "./db/drizzle-store.js";
@@ -29,9 +29,15 @@ const darwinClient = new DarwinClient({
   searchKey: env.DARWIN_SEARCH_KEY,
   actKey: env.DARWIN_ACT_KEY,
   actEnabled: env.DARWIN_ACT_ENABLED,
+  timeoutMs: 10_000,
 });
 const darwin = createDarwinExecutor({
-  darwin: env.DARWIN_MODE === "live" ? liveDarwin(darwinClient) : proxyDarwin(),
+  darwin:
+    env.DARWIN_MODE === "live"
+      ? liveDarwin(darwinClient)
+      : env.DARWIN_MODE === "proxy"
+        ? proxyDarwin()
+        : autoDarwin(liveDarwin(darwinClient), proxyDarwin(), log),
   store,
   log,
 });
