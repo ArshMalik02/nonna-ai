@@ -29,4 +29,22 @@ launchctl kickstart -k "gui/$(id -u)/ai.nonna.gateway" || true
 for _ in $(seq 1 30); do curl -fsS http://localhost:8787/health >/dev/null 2>&1 && break; sleep 2; done
 (cd "$REPO" && pnpm dial:connect "$url") || true
 
-wait "$TUNNEL_PID"
+# Watchdog: Cloudflare can drop a quick tunnel (e.g. after the Mac sleeps) while cloudflared
+# keeps retrying a dead address forever. If the public address stops answering, exit so launchd
+# restarts this service with a new tunnel and re-points Dial at it.
+failures=0
+while kill -0 "$TUNNEL_PID" 2>/dev/null; do
+  sleep 30
+  if curl -fsS -m 10 "$url/health" >/dev/null 2>&1; then
+    failures=0
+  else
+    failures=$((failures + 1))
+    echo "public address check failed ($failures/4)" >&2
+    if [[ $failures -ge 4 ]]; then
+      echo "tunnel is dead; restarting with a new address" >&2
+      exit 1
+    fi
+  fi
+done
+echo "cloudflared exited; restarting" >&2
+exit 1
