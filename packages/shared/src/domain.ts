@@ -79,3 +79,18 @@ export const Approval = z.object({
   expiresAt: z.iso.datetime(),
 });
 export type Approval = z.infer<typeof Approval>;
+
+/**
+ * Normalizes a phone number to E.164. Dial reports some numbers without the "+1" (e.g. the
+ * caller on a call record: "3412193611"), so every lookup goes through this. Non-phone handles
+ * (an Apple ID email) are returned lowercased and otherwise unchanged.
+ */
+export function normalizePhone(value: string): string {
+  const v = value.trim();
+  if (v.includes("@")) return v.toLowerCase();
+  const digits = v.replace(/\D/g, "");
+  if (v.startsWith("+")) return `+${digits}`;
+  if (digits.length === 10) return `+1${digits}`; // US/Canada without country code
+  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+  return digits ? `+${digits}` : v;
+}

@@ -1,5 +1,12 @@
 import { randomUUID } from "node:crypto";
-import type { CircleMember, Elder, Task, TaskKind, TaskStatus } from "@nonna/shared";
+import {
+  type CircleMember,
+  type Elder,
+  normalizePhone,
+  type Task,
+  type TaskKind,
+  type TaskStatus,
+} from "@nonna/shared";
 import type { DarwinAgent, DarwinPendingRequest } from "./darwin/types.js";
 
 export interface NewTask {
@@ -159,11 +166,12 @@ export class MemoryStore implements Store {
     return this.elders.get(id);
   }
   async findElderByPhone(phone: string) {
-    return [...this.elders.values()].find((e) => e.phone === phone);
+    const p = normalizePhone(phone);
+    return [...this.elders.values()].find((e) => e.phone === p);
   }
   async findElderByFamilyHandle(handle: string) {
-    const h = handle.toLowerCase();
-    const member = this.circle.find((m) => m.phone === handle || m.imessageHandle === h);
+    const h = normalizePhone(handle);
+    const member = this.circle.find((m) => m.phone === h || m.imessageHandle === h);
     return member ? this.elders.get(member.elderId) : undefined;
   }
   async listCircle(elderId: string) {

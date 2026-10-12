@@ -1,5 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { type CircleMember, type Elder, type Task, TaskStatus } from "@nonna/shared";
+import {
+  type CircleMember,
+  type Elder,
+  normalizePhone,
+  type Task,
+  TaskStatus,
+} from "@nonna/shared";
 import { and, asc, desc, eq, gte, inArray, notInArray, or } from "drizzle-orm";
 import type { DarwinAgent, DarwinPendingRequest } from "../darwin/types.js";
 import type { DarwinRun, FamilyGroup, NewTask, NewTaskStep, Store } from "../store.js";
@@ -103,7 +109,8 @@ export class DrizzleStore implements Store {
   }
 
   async findElderByPhone(phone: string) {
-    const [row] = await this.db.select().from(elders).where(eq(elders.phone, phone)).limit(1);
+    const p = normalizePhone(phone);
+    const [row] = await this.db.select().from(elders).where(eq(elders.phone, p)).limit(1);
     return row ? toElder(row) : undefined;
   }
 
@@ -113,7 +120,10 @@ export class DrizzleStore implements Store {
       .from(circleMembers)
       .innerJoin(elders, eq(circleMembers.elderId, elders.id))
       .where(
-        or(eq(circleMembers.phone, handle), eq(circleMembers.imessageHandle, handle.toLowerCase())),
+        or(
+          eq(circleMembers.phone, normalizePhone(handle)),
+          eq(circleMembers.imessageHandle, handle.trim().toLowerCase()),
+        ),
       )
       .limit(1);
     return row ? toElder(row.elder) : undefined;
